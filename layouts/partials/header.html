@@ -1,4 +1,4 @@
-<header class="hero" style="--hero-image:url('{{ site.Params.heroImage }}')">
+<header class="hero{{ if .IsHome }} hero-home{{ end }}" style="--hero-image:url('{{ site.Params.heroImage }}')">
   <nav class="top-nav" aria-label="主导航">
     <details class="mobile-menu"><summary aria-label="打开导航">☰</summary><div class="menu-panel">{{ partial "navlinks.html" . }}</div></details>
     <div class="desktop-links">{{ partial "navlinks.html" . }}</div>
