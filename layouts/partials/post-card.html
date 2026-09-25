@@ -1,5 +1,21 @@
 <article class="post-card card-{{ .Params.cardStyle | default "standard" }}{{ if .Params.pinned }} is-pinned{{ end }}">
-  {{ with .Params.cover }}<a class="card-cover" href="{{ $.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" loading="lazy"></a>{{ end }}
+  {{ $cover := .Params.cover }}
+  {{ if not $cover }}
+    {{ $style := .Params.cardStyle | default "standard" }}
+    {{ $targetRatio := 1.5 }}
+    {{ if eq $style "wide" }}{{ $targetRatio = 1.78 }}{{ else if eq $style "tall" }}{{ $targetRatio = 0.72 }}{{ end }}
+    {{ $scored := slice }}
+    {{ $bestDiff := 999.0 }}
+    {{ range hugo.Data.gallery.images }}
+      {{ $diff := math.Abs (sub .ratio $targetRatio) }}
+      {{ $scored = append (dict "item" . "diff" $diff) $scored }}
+      {{ if lt $diff $bestDiff }}{{ $bestDiff = $diff }}{{ end }}
+    {{ end }}
+    {{ $pool := slice }}
+    {{ range $scored }}{{ if le .diff (add $bestDiff 0.22) }}{{ $pool = append .item $pool }}{{ end }}{{ end }}
+    {{ with index (shuffle $pool) 0 }}{{ $cover = .image }}{{ end }}
+  {{ end }}
+  {{ with $cover }}<a class="card-cover" href="{{ $.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" loading="lazy"></a>{{ end }}
   <div class="card-body">
     <div class="card-meta"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006 · 01 · 02" }}</time>{{ with .Params.categories }}<span>{{ index . 0 }}</span>{{ end }}</div>
     <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
