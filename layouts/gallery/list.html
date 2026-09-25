@@ -1,0 +1,9 @@
+{{ define "main" }}
+<section class="gallery-page">
+  <a class="back-link" href="{{ site.Home.RelPermalink }}">← 返回书房</a>
+  <header class="gallery-heading"><p class="eyebrow">THE TYPE-MOON COLLECTION</p><h1>{{ .Title }}</h1><p>{{ .Description }}</p></header>
+  <div class="gallery-grid">
+    {{ range hugo.Data.gallery.images }}<figure class="gallery-item"><a href="{{ .image | relURL }}" target="_blank"><img src="{{ .image | relURL }}" alt="型月角色收藏 {{ .number }}" loading="lazy"></a><figcaption>{{ if .caption }}{{ .caption }}{{ else }}COLLECTION · {{ .number }}{{ end }}</figcaption></figure>{{ end }}
+  </div>
+</section>
+{{ end }}

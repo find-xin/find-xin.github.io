@@ -1,0 +1,22 @@
+baseURL = 'https://find-xin.github.io/'
+locale = 'zh-CN'
+title = '月影书房'
+
+[params]
+  description = '在月色与魔法之间，收藏一些故事。'
+  heroImage = '/images/aozaki-alice-hero.webp'
+  heroTitle = '月影书房'
+  heroSubtitle = '在月色与魔法之间，收藏一些故事。'
+  friendsURL = '/friends/'
+  guestbookURL = '/guestbook/'
+  searchURL = '/search/'
+  tagsURL = '/tags/'
+  author = 'find-xin'
+  avatar = '/images/avatar-placeholder.svg'
+
+[taxonomies]
+  tag = 'tags'
+  category = 'categories'
+
+[markup.goldmark.renderer]
+  unsafe = false

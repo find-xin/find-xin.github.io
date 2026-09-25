@@ -1,0 +1,9 @@
+<article class="post-card card-{{ .Params.cardStyle | default "standard" }}{{ if .Params.pinned }} is-pinned{{ end }}">
+  {{ with .Params.cover }}<a class="card-cover" href="{{ $.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" loading="lazy"></a>{{ end }}
+  <div class="card-body">
+    <div class="card-meta"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006 · 01 · 02" }}</time>{{ with .Params.categories }}<span>{{ index . 0 }}</span>{{ end }}</div>
+    <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+    {{ with .Summary }}<p>{{ . | plainify | truncate 110 }}</p>{{ end }}
+    {{ with .Params.tags }}<div class="tag-list">{{ range . }}<a href="{{ "tags/" | relLangURL }}{{ . | urlize }}/">#{{ . }}</a>{{ end }}</div>{{ end }}
+  </div>
+</article>

@@ -1,0 +1,1 @@
+{{ define "main" }}<section class="listing"><p class="eyebrow">THE ARCHIVE</p><h1>{{ .Title }}</h1><div class="card-grid">{{ range .Pages.ByDate.Reverse }}{{ partial "post-card.html" . }}{{ end }}</div></section>{{ end }}

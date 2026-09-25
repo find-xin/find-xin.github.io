@@ -1,0 +1,87 @@
+images:
+  - image: /images/gallery/collection-01.webp
+    number: 01
+    source: '021dbd6adc7ae7569cfb3c2408af2ad05023e59a.jpg'
+  - image: /images/gallery/collection-02.webp
+    number: 02
+    source: '08e034f7790c9e0bff2689a1adc3e9680081523cd7f73d0dcacadacc1cd51f77.webp'
+  - image: /images/gallery/collection-03.webp
+    number: 03
+    source: '1358897.png'
+  - image: /images/gallery/collection-04.webp
+    number: 04
+    source: '1358899.png'
+  - image: /images/gallery/collection-05.webp
+    number: 05
+    source: '1358901.png'
+  - image: /images/gallery/collection-06.webp
+    number: 06
+    source: '1732611452910.jpg'
+  - image: /images/gallery/collection-07.webp
+    number: 07
+    source: '1764507349328-019ad4d5-074c-7757-9fc6-67d1aa7b936.png'
+  - image: /images/gallery/collection-08.webp
+    number: 08
+    source: '1764507595437-019ad4d8-98be-70a1-853b-2d658546183.png'
+  - image: /images/gallery/collection-09.webp
+    number: 09
+    source: '1764507737400-019ad4da-84ad-7d51-9a34-448308506d0.png'
+  - image: /images/gallery/collection-10.webp
+    number: 10
+    source: '1764508144795-019ad4e1-26c1-73c3-83b9-d5479170c2c.png'
+  - image: /images/gallery/collection-11.webp
+    number: 11
+    source: '1767202600940.jpg'
+  - image: /images/gallery/collection-12.webp
+    number: 12
+    source: '1767202732968.jpg'
+  - image: /images/gallery/collection-13.webp
+    number: 13
+    source: '2783bf6de74d51cbd6886924739118d20d8e701419403bb2ffc83fb31fd5dc9c (1).jpg'
+  - image: /images/gallery/collection-14.webp
+    number: 14
+    source: '5cd1c2a6b8bc55c7907a8896b466c408cf1690130d5d95ce922d0026aa404205.webp'
+  - image: /images/gallery/collection-15.webp
+    number: 15
+    source: '661f6844816cd05160549cb67b117695059ae1d7bb539240f8d57ac29a30dd98.jpg'
+  - image: /images/gallery/collection-16.webp
+    number: 16
+    source: '69c6fe860385f9c664736e01c885659c4d5735b2_raw.jpg'
+  - image: /images/gallery/collection-17.webp
+    number: 17
+    source: 'IMG_20250108_234054.png'
+  - image: /images/gallery/collection-18.webp
+    number: 18
+    source: 'IMG_20250116_232900.png'
+  - image: /images/gallery/collection-19.webp
+    number: 19
+    source: 'IMG_20250116_233256.jpg'
+  - image: /images/gallery/collection-20.webp
+    number: 20
+    source: 'IMG_20250726_194217.jpg'
+  - image: /images/gallery/collection-21.webp
+    number: 21
+    source: 'IMG_20250726_194251.jpg'
+  - image: /images/gallery/collection-22.webp
+    number: 22
+    source: 'IMG_20250726_223320.png'
+  - image: /images/gallery/collection-23.webp
+    number: 23
+    source: 'IMG_20260101_224947.jpg'
+  - image: /images/gallery/collection-24.webp
+    number: 24
+    source: 'cd0cab6df23525c565fa307ea40bf86b07ee5e8f8cfdb962eef4303e687eb8fd.jpg'
+  - image: /images/gallery/collection-25.webp
+    number: 25
+    source: 'null3b9c5bb3c314cb0.jpg'
+  - image: /images/gallery/collection-26.webp
+    number: 26
+    source: 'v2-553d3c5db2685d4a8f2f83928aaba5ac_1440w.webp'
+  - image: /images/gallery/collection-27.webp
+    number: 27
+    source: '415483.png'
+    caption: '雨巷与红伞'
+  - image: /images/gallery/collection-28.webp
+    number: 28
+    source: '1408443.jpg'
+    caption: '夜色与青色魔法'

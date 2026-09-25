@@ -1,0 +1,5 @@
+{{ define "main" }}
+<section class="intro-row"><div><p class="eyebrow">AOKO · ALICE · TYPE-MOON</p><h1>夜色里，收藏喜欢的故事。</h1><p class="intro-copy">这里有《魔法使之夜》的静谧夜色、《月姬》的月光，也有 Fate 的英雄群像。</p></div><aside class="profile"><img src="{{ site.Params.avatar | relURL }}" alt="头像"><div><strong>{{ site.Params.author }}</strong><span>型月作品与游戏随笔</span></div></aside></section>
+<section class="shelf"><div class="section-heading"><div><span class="eyebrow">THE ARCHIVE</span><h2>最近的记录</h2></div><div class="shelf-links"><a href="{{ "gallery/" | relURL }}">角色画廊 ↗</a><a href="{{ "tags/" | relURL }}">浏览标签 ↗</a></div></div>
+<div class="card-grid">{{ range (where site.RegularPages "Section" "posts").ByDate.Reverse }}{{ partial "post-card.html" . }}{{ else }}<p>还没有文章，开始写下第一篇吧。</p>{{ end }}</div></section>
+{{ end }}
