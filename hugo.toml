@@ -12,7 +12,7 @@ title = 'Xin 的技术手记'
   searchURL = '/search/'
   tagsURL = '/tags/'
   author = 'find-xin'
-  avatar = '/images/avatar-placeholder.svg'
+  avatar = '/images/gallery/collection-09.webp'
 
 [taxonomies]
   tag = 'tags'
