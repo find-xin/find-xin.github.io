@@ -1,1 +1,7 @@
-<a href="{{ site.Params.friendsURL }}">友链</a><a href="{{ site.Params.guestbookURL }}">留言</a><a href="{{ site.Params.searchURL }}">搜索</a><a href="{{ site.Params.tagsURL }}">标签</a>
+<a class="nav-item{{ if .IsHome }} active{{ end }}" href="{{ site.Home.RelPermalink }}">首页</a>
+<a class="nav-item{{ if eq .Section "posts" }} active{{ end }}" href="{{ "posts/" | relURL }}">归档</a>
+<a class="nav-item{{ if eq .Section "categories" }} active{{ end }}" href="{{ "categories/" | relURL }}">分类</a>
+<a class="nav-item{{ if eq .Section "tags" }} active{{ end }}" href="{{ "tags/" | relURL }}">标签</a>
+<a class="nav-item{{ if eq .Section "gallery" }} active{{ end }}" href="{{ "gallery/" | relURL }}">收藏</a>
+<a class="nav-item{{ if eq .Section "friends" }} active{{ end }}" href="{{ site.Params.friendsURL | relURL }}">友链</a>
+<a class="nav-item{{ if eq .Section "guestbook" }} active{{ end }}" href="{{ site.Params.guestbookURL | relURL }}">留言</a>

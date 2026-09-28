@@ -3,7 +3,7 @@ title: '圣杯战争观测札记'
 date: 2026-09-12T18:30:00+08:00
 draft: false
 summary: '一些关于命运、愿望与英雄的零散记录。'
-cover: ''
+cover: '/images/gallery/collection-09.webp'
 cardStyle: text
 tags: ['Fate', '随笔']
 categories: ['型月']

@@ -1,5 +1,21 @@
 {{ define "main" }}
-<section class="intro-row"><div><p class="eyebrow">DEVLOG · TECH NOTES · TYPE-MOON</p><h1>把每天做过的事，写成以后用得上的记录。</h1><p class="intro-copy">这里主要记录开发实践、项目进度和日常复盘；偶尔也写写《魔法使之夜》《月姬》和 Fate。</p></div><aside class="profile"><div class="profile-avatar"><span class="avatar-crop"><img src="{{ site.Params.avatar | relURL }}" alt="贞德〔Alter〕"></span><span class="avatar-star" aria-hidden="true">✦</span></div><div class="profile-copy"><span class="profile-label">DEVELOPER LOG</span><strong>{{ site.Params.author }}</strong><span class="profile-note">开发实践 <i>·</i> 日常进度</span></div><span class="profile-sigil" aria-hidden="true">✦</span></aside></section>
-<section class="shelf"><div class="section-heading"><div><span class="eyebrow">THE LOGBOOK</span><h2>最近更新</h2></div><div class="shelf-links"><a href="{{ "gallery/" | relURL }}">型月收藏 ↗</a><a href="{{ "tags/" | relURL }}">浏览标签 ↗</a></div></div>
-<div class="card-grid">{{ range (where site.RegularPages "Section" "posts").ByDate.Reverse }}{{ partial "post-card.html" . }}{{ else }}<p>还没有文章，开始写下第一篇吧。</p>{{ end }}</div></section>
+{{ $posts := (where site.RegularPages "Section" "posts").ByDate.Reverse }}
+<section class="author-card-section" aria-label="作者">
+  <div class="author-card-container">
+    <div class="author-card author-card--large author-card--full-image">
+      <img class="author-card-art" src="{{ site.Params.heroImage | relURL }}" alt="星空与蓝色花海中的两位少女" width="3456" height="2160" fetchpriority="high">
+      <div class="author-card-profile"><div class="author-avatar"><img src="{{ site.Params.avatar | relURL }}" alt="{{ site.Params.author }} 的头像" width="120" height="120"></div>
+      <div class="author-info"><h1 class="author-name">{{ site.Params.author }}</h1><div class="author-social"><a class="social-link" href="{{ site.Params.githubURL }}" rel="me noopener" target="_blank" aria-label="{{ site.Params.author }} 的 GitHub">GitHub ↗</a></div></div></div>
+    </div>
+  </div>
+</section>
+<section class="articles-section" aria-label="文章">
+  <div class="articles-grid{{ if le (len $posts) 3 }} articles-grid--few{{ end }}">
+    {{ range $index, $post := $posts }}
+      {{ $sizes := slice "large" "medium" "small" "wide" "tall" }}
+      {{ $size := index $sizes (mod $index 5) }}
+      {{ partial "mag-card.html" (dict "page" $post "size" $size "priority" (eq $index 0)) }}
+    {{ end }}
+  </div>
+</section>
 {{ end }}

@@ -1,3 +1,3 @@
 ---
-title: 'Xin 的技术手记'
+title: 'Xin 的博客'
 ---

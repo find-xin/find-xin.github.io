@@ -1,9 +1,14 @@
 {{ define "main" }}
-<section class="gallery-page">
-  <a class="back-link" href="{{ site.Home.RelPermalink }}">← 返回书房</a>
-  <header class="gallery-heading"><p class="eyebrow">THE TYPE-MOON COLLECTION</p><h1>{{ .Title }}</h1><p>{{ .Description }}</p></header>
+<section class="gallery-page shell">
+  <a class="back-link" href="{{ site.Home.RelPermalink }}">← 返回博客首页</a>
+  <header class="page-heading"><div><p class="eyebrow">画面收藏</p><h1>{{ .Title }}</h1></div><p class="heading-note">把喜欢的画面留下，<br>让故事在此多停一会儿。</p></header>
+  <div class="gallery-toolbar"><span>{{ len hugo.Data.gallery.images }} 幅收藏</span><span>点击画作，展开欣赏 <span aria-hidden="true">↗</span></span></div>
   <div class="gallery-grid">
-    {{ range hugo.Data.gallery.images }}<figure class="gallery-item"><a href="{{ .image | relURL }}" target="_blank"><img src="{{ .image | relURL }}" alt="型月角色收藏 {{ .number }}" loading="lazy"></a><figcaption>{{ if .caption }}{{ .caption }}{{ else }}COLLECTION · {{ .number }}{{ end }}</figcaption></figure>{{ end }}
+    {{ range sort hugo.Data.gallery.images "number" "desc" }}
+    <figure class="gallery-item" id="art-{{ .number }}"><a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "收藏 %v" .number) }}"><img src="{{ .image | relURL }}" alt="{{ .caption | default (printf "型月收藏 %v" .number) }}" style="aspect-ratio: {{ .ratio }}" loading="lazy"></a><figcaption>{{ with .caption }}<span>{{ . }}</span>{{ end }}<small>#{{ .number }}</small></figcaption></figure>
+    {{ end }}
   </div>
 </section>
+<dialog class="lightbox" aria-label="画作欣赏"><div class="lightbox-top"><span class="lightbox-count"></span><button class="lightbox-close" aria-label="关闭画作" autofocus>关闭 ×</button></div><img class="lightbox-image" alt=""><div class="lightbox-bottom"><button class="lightbox-prev" aria-label="上一幅">←</button><div><p class="lightbox-caption"></p><a class="lightbox-original" target="_blank" rel="noopener">查看原图 ↗</a></div><button class="lightbox-next" aria-label="下一幅">→</button></div></dialog>
+{{ $galleryJS := resources.Get "js/gallery.js" | minify | fingerprint }}<script src="{{ $galleryJS.RelPermalink }}" integrity="{{ $galleryJS.Data.Integrity }}" defer></script>
 {{ end }}

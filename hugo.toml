@@ -1,18 +1,19 @@
 baseURL = 'https://find-xin.github.io/'
 locale = 'zh-CN'
-title = 'Xin 的技术手记'
+title = 'find-xin 的博客'
 
 [params]
   description = '记录日常开发、项目实践与偶尔的型月时刻。'
-  heroImage = '/images/gallery/collection-27.webp'
-  heroTitle = 'Xin 的技术手记'
+  heroImage = '/images/gallery/collection-31.webp'
+  heroTitle = 'find-xin 的博客'
   heroSubtitle = '记录日常开发、项目实践与偶尔的型月时刻。'
   friendsURL = '/friends/'
   guestbookURL = '/guestbook/'
   searchURL = '/search/'
   tagsURL = '/tags/'
   author = 'find-xin'
-  avatar = '/images/gallery/collection-09.webp'
+  avatar = '/images/avatar-github.jpg'
+  githubURL = 'https://github.com/find-xin'
 
 [taxonomies]
   tag = 'tags'
@@ -20,3 +21,7 @@ title = 'Xin 的技术手记'
 
 [markup.goldmark.renderer]
   unsafe = false
+
+[markup.tableOfContents]
+  startLevel = 1
+  endLevel = 6

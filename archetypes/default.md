@@ -4,7 +4,7 @@ date: {{ .Date }}
 draft: true
 summary: ''
 cover: ''
-cardStyle: standard
+pinned: false
 tags: []
 categories: []
 ---

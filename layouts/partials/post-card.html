@@ -1,25 +1,9 @@
-<article class="post-card card-{{ .Params.cardStyle | default "standard" }}{{ if .Params.pinned }} is-pinned{{ end }}">
-  {{ $cover := .Params.cover }}
-  {{ if not $cover }}
-    {{ $style := .Params.cardStyle | default "standard" }}
-    {{ $targetRatio := 1.5 }}
-    {{ if eq $style "wide" }}{{ $targetRatio = 1.78 }}{{ else if eq $style "tall" }}{{ $targetRatio = 0.72 }}{{ end }}
-    {{ $scored := slice }}
-    {{ $bestDiff := 999.0 }}
-    {{ range hugo.Data.gallery.images }}
-      {{ $diff := math.Abs (sub .ratio $targetRatio) }}
-      {{ $scored = append (dict "item" . "diff" $diff) $scored }}
-      {{ if lt $diff $bestDiff }}{{ $bestDiff = $diff }}{{ end }}
-    {{ end }}
-    {{ $pool := slice }}
-    {{ range $scored }}{{ if le .diff (add $bestDiff 0.22) }}{{ $pool = append .item $pool }}{{ end }}{{ end }}
-    {{ with index (shuffle $pool) 0 }}{{ $cover = .image }}{{ end }}
-  {{ end }}
-  {{ with $cover }}<a class="card-cover" href="{{ $.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" loading="lazy"></a>{{ end }}
-  <div class="card-body">
-    <div class="card-meta"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006 · 01 · 02" }}</time>{{ with .Params.categories }}<span>{{ index . 0 }}</span>{{ end }}</div>
+<article class="post-entry{{ if not .Params.cover }} without-cover{{ end }}">
+  {{ with .Params.cover }}<a class="entry-art" href="{{ $.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" loading="lazy"></a>{{ end }}
+  <div class="entry-copy">
+    <div class="post-meta"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006.01.02" }}</time>{{ range .GetTerms "categories" }}<a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}{{ if .Params.pinned }}<span class="pinned-label">置顶</span>{{ end }}</div>
     <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
     {{ with .Summary }}<p>{{ . | plainify | truncate 110 }}</p>{{ end }}
-    {{ with .Params.tags }}<div class="tag-list">{{ range . }}<a href="{{ "tags/" | relLangURL }}{{ . | urlize }}/">#{{ . }}</a>{{ end }}</div>{{ end }}
+    <div class="entry-bottom">{{ with .GetTerms "tags" }}<div class="tag-list">{{ range . }}<a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}<a class="entry-arrow" href="{{ .RelPermalink }}" aria-label="阅读：{{ .Title }}"><span aria-hidden="true">→</span></a></div>
   </div>
 </article>

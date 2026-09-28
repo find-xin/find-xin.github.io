@@ -1,7 +1,7 @@
-<header class="hero{{ if .IsHome }} hero-home{{ end }}" style="--hero-image:url('{{ site.Params.heroImage }}')">
-  <nav class="top-nav" aria-label="主导航">
-    <details class="mobile-menu"><summary aria-label="打开导航">☰</summary><div class="menu-panel">{{ partial "navlinks.html" . }}</div></details>
-    <div class="desktop-links">{{ partial "navlinks.html" . }}</div>
-  </nav>
-  <a class="hero-title" href="{{ site.Home.RelPermalink }}"><span>{{ site.Params.heroTitle | default site.Title }}</span><small>{{ site.Params.heroSubtitle | default site.Params.description }}</small></a>
+<header class="header navbar-bubble">
+  <nav class="nav" aria-label="主导航"><div class="nav-container">
+    <a class="nav-logo" href="{{ site.Home.RelPermalink }}">{{ site.Params.author }}</a>
+    <div class="nav-menu">{{ partial "navlinks.html" . }}</div>
+    <div class="nav-actions"><a class="nav-search" href="{{ site.Params.searchURL | relURL }}" aria-label="搜索">⌕</a><button class="theme-toggle" type="button" aria-label="切换为夜间模式" aria-pressed="false"><span class="theme-icon" aria-hidden="true">☾</span><span class="theme-label" aria-hidden="true">夜间</span></button><details class="mobile-menu"><summary aria-label="打开菜单"><span></span><span></span><span></span></summary><div class="mobile-menu-panel">{{ partial "navlinks.html" . }}</div></details></div>
+  </div></nav>
 </header>

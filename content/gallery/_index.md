@@ -1,5 +1,5 @@
 ---
-title: '角色画廊'
+title: '型月收藏'
 description: '收藏的型月角色插画。'
 ---
 
