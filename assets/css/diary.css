@@ -642,6 +642,21 @@ body.dark-mode .diary-card-footer {
   margin-bottom: 1.25em;
 }
 
+/* Diary Literary Drop Cap */
+.diary-detail-content > p:first-of-type::first-letter {
+  font-family: var(--font-secondary);
+  font-size: 3em;
+  float: left;
+  line-height: 0.85;
+  margin-right: 0.12em;
+  margin-top: 0.06em;
+  color: #ff2442;
+  font-weight: 700;
+}
+body.dark-mode .diary-detail-content > p:first-of-type::first-letter {
+  color: #ff526b;
+}
+
 .diary-detail-content img {
   border-radius: 10px;
   margin: 1.5em auto;

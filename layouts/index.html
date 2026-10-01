@@ -15,22 +15,19 @@
         <span class="shooting-star"></span>
       </div>
       <div class="author-card-profile">
-        <div class="author-avatar"><img src="{{ site.Params.avatar | relURL }}" alt="{{ site.Params.author }} 的头像" width="120" height="120"></div>
+        <div class="author-avatar">
+          <img src="{{ site.Params.avatar | relURL }}" alt="{{ site.Params.author }} 的头像" width="120" height="120">
+          <span class="avatar-status-dot" title="活跃在线" aria-label="在线"></span>
+        </div>
         <div class="author-info">
-          <div class="author-status"><span class="status-dot"></span><span>灵感在线 · 读书与代码</span></div>
           <h1 class="author-name">{{ site.Params.author }}</h1>
           {{ with site.Params.heroSubtitle }}<p class="author-bio">{{ . }}</p>{{ end }}
-          <div class="author-now-playing" aria-label="近期状态">
-            <span class="now-icon">🎵</span>
-            <span class="now-text">循环中：深海与星空 · 苍穹之境</span>
-          </div>
           <div class="author-social">
             <a class="social-link" href="{{ site.Params.githubURL }}" rel="me noopener" target="_blank" aria-label="{{ site.Params.author }} 的 GitHub">GitHub ↗</a>
             <a class="social-link social-link--sub" href="{{ "diary/" | relURL }}">翻开日记 ✨</a>
           </div>
         </div>
       </div>
-      <div class="hero-quote" aria-hidden="true"><span>“在星空与字句之间，留下时间的刻度。”</span></div>
     </div>
   </div>
 </section>
