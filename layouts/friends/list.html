@@ -1,0 +1,34 @@
+{{ define "main" }}
+<section class="friends-page shell">
+  <header class="page-heading">
+    <p class="diary-eyebrow">FRIENDS & BLOGS</p>
+    <h1>{{ .Title }}</h1>
+    <p class="friends-subtitle">{{ .Description | default "海内存知己，天涯若比邻。收录常读的个人站点与朋友们。" }}</p>
+  </header>
+
+  <div class="friends-grid">
+    {{ range hugo.Data.friends.friends }}
+    <a class="friend-card" href="{{ .link }}" target="_blank" rel="noopener">
+      <div class="friend-avatar-wrap">
+        <img class="friend-avatar" src="{{ .avatar | relURL }}" alt="{{ .name }}" loading="lazy">
+      </div>
+      <div class="friend-info">
+        <div class="friend-top">
+          <h2 class="friend-name">{{ .name }}</h2>
+          {{ with .tag }}<span class="friend-tag">{{ . }}</span>{{ end }}
+          <span class="friend-arrow" aria-hidden="true">↗</span>
+        </div>
+        <p class="friend-bio">{{ .bio }}</p>
+      </div>
+    </a>
+    {{ end }}
+  </div>
+
+  <div class="friend-apply-card">
+    <h2 class="friend-apply-title">🤝 交换友链</h2>
+    <div class="friend-apply-content post-content">
+      {{ .Content }}
+    </div>
+  </div>
+</section>
+{{ end }}

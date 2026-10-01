@@ -1,0 +1,90 @@
+{{ define "main" }}
+<section class="diary-page shell">
+  <header class="diary-header">
+    <div class="diary-header-top">
+      <div>
+        <p class="diary-eyebrow">DAILY NOTES · 生活手记</p>
+        <h1 class="diary-title">{{ .Title }}</h1>
+        <p class="diary-desc">{{ .Description | default "记录生活碎片、灵感切片与所思所感。" }}</p>
+      </div>
+      <div class="diary-stats-badge">
+        <span>📖 共 {{ len .Pages }} 篇日记</span>
+      </div>
+    </div>
+
+    <!-- Collect tags dynamically -->
+    {{ $allTags := slice }}
+    {{ range .Pages }}
+      {{ with .Params.tags }}
+        {{ range . }}
+          {{ $allTags = $allTags | append . }}
+        {{ end }}
+      {{ end }}
+    {{ end }}
+    {{ $allTags = $allTags | uniq }}
+
+    <div class="diary-toolbar">
+      <div class="diary-filter-tabs" role="tablist" aria-label="日记分类">
+        <button class="diary-filter-tab active" type="button" data-tag="all">✨ 全部</button>
+        {{ range $allTags }}
+          <button class="diary-filter-tab" type="button" data-tag="{{ . }}">#{{ . }}</button>
+        {{ end }}
+      </div>
+    </div>
+  </header>
+
+  <div class="diary-waterfall-wrapper" id="diary-waterfall-wrapper">
+    {{ range .Pages.ByDate.Reverse }}
+      {{ $postID := .File.UniqueID | default .RelPermalink }}
+      {{ $tagString := delimit (.Params.tags | default slice) "," }}
+      <article class="diary-card" data-tags="{{ $tagString }}" data-id="{{ $postID }}">
+        {{ if .Params.cover }}
+          <div class="diary-card-cover">
+            <div class="diary-badges-row">
+              {{ with .Params.mood }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ else }}{{ with .Params.weather }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ end }}{{ end }}
+              {{ if .Params.pinned }}<span class="diary-badge diary-badge-pinned">置顶</span>{{ end }}
+              {{ with .Params.photos }}<span class="diary-badge diary-badge-photos">📷 {{ len . }}</span>{{ end }}
+            </div>
+            <a href="{{ .RelPermalink }}" tabindex="-1" aria-hidden="true">
+              <img src="{{ .Params.cover | relURL }}" alt="{{ .Title }}" loading="lazy" {{ with .Params.coverRatio }}style="aspect-ratio: {{ . | safeCSS }};"{{ end }}>
+            </a>
+          </div>
+        {{ else }}
+          <div class="diary-card-text-cover">
+            <span class="diary-quote-watermark" aria-hidden="true">“</span>
+            <div class="diary-badges-row">
+              {{ with .Params.mood }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ else }}{{ with .Params.weather }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ end }}{{ end }}
+              {{ if .Params.pinned }}<span class="diary-badge diary-badge-pinned">置顶</span>{{ end }}
+            </div>
+            <p class="diary-text-quote">{{ .Summary | default .Plain | truncate 70 }}</p>
+          </div>
+        {{ end }}
+
+        <div class="diary-card-info">
+          <h2 class="diary-card-title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+          {{ with .Summary }}
+            <p class="diary-card-snippet">{{ . | plainify | truncate 65 }}</p>
+          {{ end }}
+          {{ with .Params.tags }}
+            <div class="diary-card-tags">
+              {{ range first 2 . }}
+                <span class="diary-card-tag">#{{ . }}</span>
+              {{ end }}
+            </div>
+          {{ end }}
+          <div class="diary-card-footer">
+            <div class="diary-card-author">
+              <img class="diary-author-avatar" src="{{ site.Params.avatar | relURL }}" alt="{{ site.Params.author }}" width="18" height="18" loading="lazy">
+              <span class="diary-card-date">{{ .Date.Format "01-02" }}</span>
+            </div>
+            <button class="diary-like-btn" type="button" aria-label="点赞" data-id="{{ $postID }}" data-likes="{{ .Params.likes | default 5 }}">
+              <span class="heart-icon">♡</span>
+              <span class="like-count">{{ .Params.likes | default 5 }}</span>
+            </button>
+          </div>
+        </div>
+      </article>
+    {{ end }}
+  </div>
+</section>
+{{ end }}

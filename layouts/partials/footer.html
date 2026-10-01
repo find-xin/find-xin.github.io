@@ -1,1 +1,20 @@
-<footer class="footer"><div class="footer-bottom"><p class="footer-copyright">© {{ now.Year }} {{ site.Params.author }}</p></div></footer>
+<footer class="footer">
+  <div class="footer-inner shell">
+    <div class="footer-brand">
+      <p class="footer-title">{{ site.Title }}</p>
+      <p class="footer-motto">{{ site.Params.description | default "记录日常开发、生活切片与偶尔的型月时刻。" }}</p>
+    </div>
+    <div class="footer-links">
+      <a href="{{ site.Home.RelPermalink }}">首页</a>
+      <a href="{{ "diary/" | relURL }}">日记</a>
+      <a href="{{ "posts/" | relURL }}">归档</a>
+      <a href="{{ "gallery/" | relURL }}">收藏</a>
+      <a href="{{ site.Params.friendsURL | relURL }}">友链</a>
+      <a href="{{ site.Params.guestbookURL | relURL }}">留言</a>
+      <a class="footer-rss" href="{{ "index.xml" | relURL }}" target="_blank" rel="noopener">RSS 订阅 ↗</a>
+    </div>
+  </div>
+  <div class="footer-bottom shell">
+    <p class="footer-copyright">© {{ now.Year }} {{ site.Params.author }} · 基于 <a href="https://gohugo.io" target="_blank" rel="noopener">Hugo</a> 构建 · 以字为痕，留住夜色与灵感</p>
+  </div>
+</footer>

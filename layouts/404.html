@@ -1,10 +1,12 @@
 {{ define "main" }}
 <section class="empty-page shell" aria-labelledby="not-found-title">
   <div class="empty-page-inner">
-    <p class="eyebrow">404 · 页面未找到</p>
-    <h1 id="not-found-title">这页暂时不在这里</h1>
-    <p>地址可能已经变更，或者这段路还没有文章。回到首页，继续从最近的文字读起。</p>
-    <a href="{{ site.Home.RelPermalink }}">返回博客首页 →</a>
+    <div class="empty-page-badge" aria-hidden="true">🪐 ✦ 404</div>
+    <h1 id="not-found-title" class="empty-page-title">这页暂时不在这里</h1>
+    <p class="empty-page-desc">地址可能已经变更，或者这段路还没有文章。<br>回到首页，继续从最近的文字读起。</p>
+    <div class="empty-page-actions">
+      <a class="empty-page-btn" href="{{ site.Home.RelPermalink }}">返回博客首页 →</a>
+    </div>
   </div>
 </section>
 {{ end }}

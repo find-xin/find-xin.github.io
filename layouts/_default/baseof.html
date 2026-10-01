@@ -10,13 +10,19 @@
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('xin-theme')==='dark'?'dark':'light'}catch{document.documentElement.dataset.theme='light'}document.documentElement.classList.toggle('dark-mode',document.documentElement.dataset.theme==='dark')</script>
   {{ $original := resources.Get "css/magzine-original.css" | minify | fingerprint }}<link rel="stylesheet" href="{{ $original.RelPermalink }}" integrity="{{ $original.Data.Integrity }}">
   {{ $css := resources.Get "css/magzine-hugo.css" | minify | fingerprint }}<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
+  {{ if eq .Section "diary" }}
+  {{ $diaryCSS := resources.Get "css/diary.css" | minify | fingerprint }}<link rel="stylesheet" href="{{ $diaryCSS.RelPermalink }}" integrity="{{ $diaryCSS.Data.Integrity }}">
+  {{ $diaryJS := resources.Get "js/diary.js" | minify | fingerprint }}<script src="{{ $diaryJS.RelPermalink }}" integrity="{{ $diaryJS.Data.Integrity }}" defer></script>
+  {{ end }}
   {{ $themeJS := resources.Get "js/theme.js" | minify | fingerprint }}<script src="{{ $themeJS.RelPermalink }}" integrity="{{ $themeJS.Data.Integrity }}" defer></script>
 </head>
 <body id="top"{{ if .IsHome }} class="is-home"{{ end }}>
+  <div id="reading-progress" class="reading-progress" aria-hidden="true"></div>
   <script>document.body.classList.toggle('dark-mode',document.documentElement.dataset.theme==='dark')</script>
   <a class="skip-link" href="#main">跳到正文</a>
   {{ partial "header.html" . }}
   <main id="main">{{ block "main" . }}{{ end }}</main>
   {{ partial "footer.html" . }}
+  <button id="back-to-top" class="back-to-top" type="button" aria-label="返回顶部">↑</button>
 </body>
 </html>
