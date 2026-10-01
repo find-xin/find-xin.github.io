@@ -262,4 +262,14 @@
       } catch (_) {}
     }
   });
+
+  // 10. Blog running days counter
+  const daysEl = document.getElementById('blog-days');
+  if (daysEl) {
+    const startDate = new Date('2026-01-01T00:00:00');
+    const now = new Date();
+    const diffTime = Math.abs(now - startDate);
+    const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    daysEl.textContent = String(diffDays);
+  }
 })();

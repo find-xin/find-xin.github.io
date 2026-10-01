@@ -20,6 +20,23 @@
     {{ with .GetTerms "tags" }}<div class="post-tags">{{ range . }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}
   </header>
   <div class="post-content" id="post-content">{{ .Content }}</div>
+  <div class="post-signature-card">
+    <div class="signature-avatar-wrap">
+      <img class="signature-avatar" src="{{ site.Params.avatar | relURL }}" alt="{{ site.Params.author }}" width="56" height="56">
+      <span class="signature-status-dot" title="活跃在线"></span>
+    </div>
+    <div class="signature-content">
+      <div class="signature-author-row">
+        <span class="signature-name">{{ site.Params.author }}</span>
+        <span class="signature-badge">博主</span>
+      </div>
+      <p class="signature-motto">“感谢你读到这里。如果这篇文字给你带来了一丝启发或共鸣，欢迎去留言板留下你的印记。”</p>
+      <div class="signature-actions">
+        <a class="signature-btn signature-btn--primary" href="{{ site.Params.guestbookURL | relURL }}">💌 去留言板交流</a>
+        <a class="signature-btn" href="{{ "diary/" | relURL }}">✨ 翻翻生活日记</a>
+      </div>
+    </div>
+  </div>
   <nav class="post-navigation" aria-label="相邻文章">{{ with .PrevInSection }}<a class="post-nav prev" href="{{ .RelPermalink }}"><span class="nav-label">← 上一篇</span><span class="nav-title">{{ .Title }}</span></a>{{ end }}{{ with .NextInSection }}<a class="post-nav next" href="{{ .RelPermalink }}"><span class="nav-label">下一篇 →</span><span class="nav-title">{{ .Title }}</span></a>{{ end }}</nav>
 </article>
 </div>

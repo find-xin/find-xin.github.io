@@ -193,7 +193,7 @@ body.dark-mode .diary-filter-tab.active {
   border: 1px solid var(--border-color);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 8px 24px -4px rgba(0, 0, 0, 0.06);
   transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s;
   cursor: pointer;
   display: flex;
@@ -207,17 +207,19 @@ body.dark-mode .diary-filter-tab.active {
 }
 
 .diary-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 16px 34px -8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 107, 107, 0.22);
   border-color: rgba(255, 107, 107, 0.35);
 }
 
 body.dark-mode .diary-card {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 body.dark-mode .diary-card:hover {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 107, 107, 0.3);
   border-color: rgba(255, 107, 107, 0.4);
 }
 
@@ -439,11 +441,19 @@ body.dark-mode .diary-card-footer {
   background: rgba(255, 36, 66, 0.08);
 }
 
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  28% { transform: scale(1.52) rotate(-14deg); filter: drop-shadow(0 0 6px rgba(255, 36, 66, 0.65)); }
+  58% { transform: scale(0.88) rotate(8deg); }
+  82% { transform: scale(1.15) rotate(-3deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
 .diary-like-btn .heart-icon {
   font-size: 13.5px;
   line-height: 1;
   display: inline-block;
-  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s ease, filter 0.2s ease;
 }
 
 .diary-like-btn.is-liked {
@@ -452,10 +462,12 @@ body.dark-mode .diary-card-footer {
 
 .diary-like-btn.is-liked .heart-icon {
   color: #ff2442;
+  filter: drop-shadow(0 2px 5px rgba(255, 36, 66, 0.4));
 }
 
-.diary-like-btn.animating .heart-icon {
-  transform: scale(1.45);
+.diary-like-btn.animating .heart-icon,
+.diary-detail-like-btn.animating .heart-icon {
+  animation: heartPop 0.45s cubic-bezier(0.17, 0.89, 0.32, 1.49);
 }
 
 /* ===== Empty State ===== */
