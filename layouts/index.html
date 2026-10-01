@@ -5,12 +5,25 @@
     <div class="author-card author-card--large author-card--full-image">
       <img class="author-card-art" src="{{ site.Params.heroImage | relURL }}" alt="星空与蓝色花海中的两位少女" width="3456" height="2160" fetchpriority="high">
       <div class="hero-vignette" aria-hidden="true"></div>
+      <div class="hero-stars" aria-hidden="true">
+        <span class="star s1"></span>
+        <span class="star s2"></span>
+        <span class="star s3"></span>
+        <span class="star s4"></span>
+        <span class="star s5"></span>
+        <span class="star s6"></span>
+        <span class="shooting-star"></span>
+      </div>
       <div class="author-card-profile">
         <div class="author-avatar"><img src="{{ site.Params.avatar | relURL }}" alt="{{ site.Params.author }} 的头像" width="120" height="120"></div>
         <div class="author-info">
           <div class="author-status"><span class="status-dot"></span><span>灵感在线 · 读书与代码</span></div>
           <h1 class="author-name">{{ site.Params.author }}</h1>
           {{ with site.Params.heroSubtitle }}<p class="author-bio">{{ . }}</p>{{ end }}
+          <div class="author-now-playing" aria-label="近期状态">
+            <span class="now-icon">🎵</span>
+            <span class="now-text">循环中：深海与星空 · 苍穹之境</span>
+          </div>
           <div class="author-social">
             <a class="social-link" href="{{ site.Params.githubURL }}" rel="me noopener" target="_blank" aria-label="{{ site.Params.author }} 的 GitHub">GitHub ↗</a>
             <a class="social-link social-link--sub" href="{{ "diary/" | relURL }}">翻开日记 ✨</a>

@@ -82,11 +82,35 @@
     });
   }
 
-  // 5. Code Block One-Click Copy
+  // 5. Code Block Enhancement (Mac Window Dots, Lang Badge & Copy)
   const codeBlocks = document.querySelectorAll('.post-content pre, .diary-single-content pre');
   codeBlocks.forEach(pre => {
     if (pre.querySelector('.code-copy-btn')) return;
 
+    // Detect language from code class
+    const codeEl = pre.querySelector('code');
+    let lang = 'CODE';
+    if (codeEl) {
+      const langClass = Array.from(codeEl.classList).find(c => c.startsWith('language-') || c.startsWith('lang-'));
+      if (langClass) {
+        lang = langClass.replace(/^(language-|lang-)/, '').toUpperCase();
+      }
+    }
+
+    // Create macOS Header Bar
+    const headerBar = document.createElement('div');
+    headerBar.className = 'code-window-header';
+    headerBar.innerHTML = `
+      <div class="code-window-dots" aria-hidden="true">
+        <span class="code-dot dot-red"></span>
+        <span class="code-dot dot-yellow"></span>
+        <span class="code-dot dot-green"></span>
+      </div>
+      <span class="code-window-lang">${lang}</span>
+    `;
+    pre.insertBefore(headerBar, pre.firstChild);
+
+    // Copy Button
     const copyBtn = document.createElement('button');
     copyBtn.className = 'code-copy-btn';
     copyBtn.type = 'button';
@@ -95,7 +119,7 @@
 
     copyBtn.addEventListener('click', async () => {
       const codeElement = pre.querySelector('code') || pre;
-      const textToCopy = codeElement.innerText.replace(/\n\n$/, '');
+      const textToCopy = (codeElement.innerText || '').replace(/\n\n$/, '');
 
       try {
         await navigator.clipboard.writeText(textToCopy);
@@ -272,4 +296,17 @@
     const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     daysEl.textContent = String(diffDays);
   }
+
+  // 11. Mouse Tracking Spotlight Effect (Linear / Apple style)
+  const spotlightCards = document.querySelectorAll('.article-card, .diary-card, .friend-card, .post-signature-card');
+  spotlightCards.forEach(card => {
+    card.classList.add('has-spotlight');
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      card.style.setProperty('--mouse-x', `${x}px`);
+      card.style.setProperty('--mouse-y', `${y}px`);
+    });
+  });
 })();
