@@ -344,8 +344,46 @@ def get_git_status():
     except Exception as e:
         return {'clean': True, 'changed_count': 0, 'files': [], 'branch': 'main', 'error': str(e)}
 
+def create_site_backup() -> tuple[bool, str]:
+    """一键打包全站核心数据（content, data, static, 配置文件）为 ZIP"""
+    import zipfile
+    backup_dir = BLOG_ROOT / 'backups'
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"blog_backup_{time.strftime('%Y%m%d_%H%M%S')}.zip"
+    zip_path = backup_dir / filename
+    
+    include_dirs = ['content', 'data', 'static']
+    include_files = ['hugo.toml', 'README.md']
+    
+    try:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for f in include_files:
+                fp = BLOG_ROOT / f
+                if fp.exists():
+                    zf.write(fp, f)
+            for d in include_dirs:
+                dp = BLOG_ROOT / d
+                if dp.exists():
+                    for root, _, files in os.walk(dp):
+                        for file in files:
+                            if not file.startswith('.'):
+                                full = Path(root) / file
+                                rel = full.relative_to(BLOG_ROOT)
+                                zf.write(full, str(rel))
+        size_mb = round(zip_path.stat().st_size / (1024 * 1024), 2)
+        return True, f"备份创建成功！文件已存至 backups/{filename}（大小：{size_mb} MB）"
+    except Exception as e:
+        return False, f"备份失败：{e}"
+
+RECENT_NOTES_CACHE = {'timestamp': 0, 'data': []}
+
 def scan_recent_notes(vault_dir_str: str = ""):
-    """探测扫描近期修改的 Markdown 或 Notebook"""
+    """探测扫描近期修改的 Markdown 或 Notebook（带10秒内存缓存）"""
+    global RECENT_NOTES_CACHE
+    now = time.time()
+    if not vault_dir_str and now - RECENT_NOTES_CACHE['timestamp'] < 10 and RECENT_NOTES_CACHE['data']:
+        return RECENT_NOTES_CACHE['data']
+
     search_dirs = []
     if vault_dir_str.strip():
         search_dirs.append(Path(vault_dir_str).expanduser())
@@ -1177,9 +1215,12 @@ HTML_PAGE = """<!DOCTYPE html>
           </div>
         </div>
 
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
           <button class="btn btn-primary" id="deploy-btn" onclick="doDeploy()" style="padding: 10px 24px; font-size: 0.95rem;">
             🚀 提交并推送到 GitHub
+          </button>
+          <button class="btn" id="backup-btn" onclick="doBackup()" style="padding: 10px 18px; font-size: 0.95rem;">
+            📦 一键打包备份全站 (ZIP)
           </button>
         </div>
 
@@ -1765,6 +1806,27 @@ HTML_PAGE = """<!DOCTYPE html>
       }
     }
 
+    async function doBackup() {
+      const btn = document.getElementById('backup-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ 正在压缩打包中...';
+      showToast('正在创建全站备份包...', 'info');
+      try {
+        const res = await fetch('/api/backup', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (e) {
+        showToast('备份异常: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📦 一键打包备份全站 (ZIP)';
+      }
+    }
+
     function escapeHtml(str) {
       if (!str) return '';
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1927,6 +1989,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             slug = payload.get('slug', '').strip()
             ok = delete_article(slug)
             self.send_json({'success': ok, 'message': '已删除' if ok else '删除失败'})
+
+        elif url.path == '/api/backup':
+            ok, msg = create_site_backup()
+            self.send_json({'success': ok, 'message': msg})
 
         elif url.path == '/api/git-push':
             msg = payload.get('message', '').strip() or 'feat: 更新博客内容'

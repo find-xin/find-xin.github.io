@@ -4,3 +4,5 @@ public/
 /work/
 __pycache__/
 *.pyc
+backups/
+*.zip

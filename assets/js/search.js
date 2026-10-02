@@ -39,8 +39,9 @@
       return;
     }
 
-    const matches = documents.filter((document) => {
-      const haystack = `${document.title} ${document.text}`.toLocaleLowerCase();
+    const matches = documents.filter((doc) => {
+      const tagsStr = Array.isArray(doc.tags) ? doc.tags.join(' ') : (doc.tags || '');
+      const haystack = `${doc.title || ''} ${doc.snippet || ''} ${tagsStr}`.toLowerCase();
       return terms.every((term) => haystack.includes(term));
     });
 
@@ -51,7 +52,7 @@
       card.className = 'search-result-card';
 
       const sectionBadge = getSectionBadge(match.url);
-      const snippet = getSnippet(match.text, terms[0]);
+      const snippet = getSnippet(match.snippet, terms[0]);
 
       card.innerHTML = `
         <div class="search-result-header">

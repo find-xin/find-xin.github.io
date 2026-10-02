@@ -33,6 +33,27 @@
       </div>
     </div>
   </div>
+  {{ $related := site.RegularPages.Related . | first 2 }}
+  {{ with $related }}
+  <section class="related-posts-section" aria-label="相关推荐">
+    <h3 class="related-posts-title"><span>✦</span> 延伸阅读 · 相关推荐</h3>
+    <div class="related-posts-grid">
+      {{ range . }}
+      {{ $rCover := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
+      <a class="related-card" href="{{ .RelPermalink }}">
+        {{ with $rCover }}
+        <div class="related-card-cover-wrap"><img class="related-card-cover" src="{{ . }}" alt="" loading="lazy" decoding="async"></div>
+        {{ end }}
+        <div class="related-card-body">
+          <time class="related-card-date">{{ .Date.Format "2006.01.02" }}</time>
+          <h4 class="related-card-title">{{ .Title }}</h4>
+          {{ with .Summary }}<p class="related-card-snippet">{{ . | plainify | truncate 50 }}</p>{{ end }}
+        </div>
+      </a>
+      {{ end }}
+    </div>
+  </section>
+  {{ end }}
   <nav class="post-navigation" aria-label="相邻文章">
     {{ with .PrevInSection }}
       <a class="post-nav prev" href="{{ .RelPermalink }}">

@@ -575,4 +575,38 @@
       bq.insertBefore(header, bq.firstChild);
     }
   });
+
+  // 16. Heading Anchors & One-Click Link Copy
+  const headingElements = document.querySelectorAll('.post-content h2[id], .post-content h3[id]');
+  headingElements.forEach(h => {
+    if (h.querySelector('.heading-anchor')) return;
+    const anchor = document.createElement('a');
+    anchor.className = 'heading-anchor';
+    anchor.href = `#${h.id}`;
+    anchor.setAttribute('aria-label', '复制该小节链接');
+    anchor.innerHTML = '<span aria-hidden="true">#</span>';
+    anchor.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const url = `${window.location.origin}${window.location.pathname}#${h.id}`;
+      history.pushState(null, '', `#${h.id}`);
+      h.scrollIntoView({ behavior: 'smooth' });
+      try {
+        await navigator.clipboard.writeText(url);
+        anchor.classList.add('is-copied');
+        setTimeout(() => anchor.classList.remove('is-copied'), 1600);
+      } catch (_) {}
+    });
+    h.appendChild(anchor);
+  });
+
+  // 17. Automatic Figcaption for Post Images
+  document.querySelectorAll('.post-content p > img, .diary-single-content p > img').forEach(img => {
+    const alt = img.getAttribute('alt');
+    if (alt && alt.trim() && alt !== '文章配图' && !img.parentElement.querySelector('.img-caption')) {
+      const caption = document.createElement('span');
+      caption.className = 'img-caption';
+      caption.textContent = alt.trim();
+      img.insertAdjacentElement('afterend', caption);
+    }
+  });
 })();
