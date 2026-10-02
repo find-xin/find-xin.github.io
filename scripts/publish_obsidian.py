@@ -131,13 +131,13 @@ def convert_to_webp_if_possible(src_file: Path, dest_dir: Path, base_clean_name:
     shutil.copy2(src_file, fallback_dest)
     return base_clean_name
 
-def list_all_articles():
-    """列出全站所有文章与日记状态"""
+def get_all_articles():
+    """获取全站所有文章与日记结构化数据"""
     posts_dir = BLOG_ROOT / 'content' / 'posts'
     diaries_dir = BLOG_ROOT / 'content' / 'diary'
 
     entries = []
-    for base_dir, type_label in [(posts_dir, '文章'), (diaries_dir, '日记')]:
+    for base_dir, type_key, type_label in [(posts_dir, 'post', '文章'), (diaries_dir, 'diary', '日记')]:
         if not base_dir.exists():
             continue
         for item in sorted(base_dir.iterdir(), reverse=True):
@@ -153,21 +153,32 @@ def list_all_articles():
             title = fm.get('title', item.stem)
             draft = fm.get('draft', 'false').lower() == 'true'
             date = fm.get('date', '未知日期')[:10]
+            cover = fm.get('cover', '')
+            if cover and not cover.startswith('/') and not cover.startswith('http'):
+                cover = f"/{'posts' if type_key == 'post' else 'diary'}/{item.stem}/{cover}"
+
             entries.append({
-                'type': type_label,
+                'type': type_key,
+                'type_label': type_label,
                 'slug': item.stem,
                 'title': title,
                 'draft': draft,
                 'date': date,
-                'path': item
+                'cover': cover,
+                'url': f"/{'posts' if type_key == 'post' else 'diary'}/{item.stem}/",
+                'path': str(item.relative_to(BLOG_ROOT))
             })
+    return entries
 
+def list_all_articles():
+    """列出全站所有文章与日记状态"""
+    entries = get_all_articles()
     print("\n📚 全站内容管理列表：")
     print(f"{'类型':<6} {'状态':<8} {'日期':<12} {'Slug / 标识':<22} {'标题'}")
     print("-" * 75)
     for e in entries:
         status_tag = "🟡 已下架" if e['draft'] else "🟢 正常"
-        print(f"{e['type']:<6} {status_tag:<8} {e['date']:<12} {e['slug']:<22} {e['title']}")
+        print(f"{e['type_label']:<6} {status_tag:<8} {e['date']:<12} {e['slug']:<22} {e['title']}")
     print(f"\n共找到 {len(entries)} 篇文章/日记。\n")
 
 def find_target_item(keyword: str):
