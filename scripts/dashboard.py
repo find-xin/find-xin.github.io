@@ -1219,6 +1219,9 @@ HTML_PAGE = """<!DOCTYPE html>
           <button class="btn btn-primary" id="deploy-btn" onclick="doDeploy()" style="padding: 10px 24px; font-size: 0.95rem;">
             🚀 提交并推送到 GitHub
           </button>
+          <button class="btn" id="pull-btn" onclick="doPull()" style="padding: 10px 18px; font-size: 0.95rem;">
+            ⬇️ 拉取远程更新 (Git Pull)
+          </button>
           <button class="btn" id="backup-btn" onclick="doBackup()" style="padding: 10px 18px; font-size: 0.95rem;">
             📦 一键打包备份全站 (ZIP)
           </button>
@@ -1806,6 +1809,33 @@ HTML_PAGE = """<!DOCTYPE html>
       }
     }
 
+    async function doPull() {
+      const btn = document.getElementById('pull-btn');
+      const log = document.getElementById('deploy-log');
+      btn.disabled = true;
+      btn.textContent = '⏳ 正在拉取远程更新...';
+      log.style.display = 'block';
+      log.textContent = '正在执行 git pull --rebase origin main...\n';
+
+      try {
+        const res = await fetch('/api/git-pull', { method: 'POST' });
+        const data = await res.json();
+        log.textContent = data.output;
+        if (data.success) {
+          showToast('🎉 拉取完成，本地代码已是最新！', 'success');
+          checkGitStatus();
+          loadArticles();
+        } else {
+          showToast('❌ 拉取遇到问题，请检查日志', 'error');
+        }
+      } catch (e) {
+        showToast('网络异常：' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⬇️ 拉取远程更新 (Git Pull)';
+      }
+    }
+
     async function doBackup() {
       const btn = document.getElementById('backup-btn');
       btn.disabled = true;
@@ -1833,8 +1863,43 @@ HTML_PAGE = """<!DOCTYPE html>
     }
     function escapeJs(str) {
       if (!str) return '';
-      return String(str).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
+      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     }
+
+    // 支持拖拽文件直接识别填充路径
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    window.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+      const file = e.dataTransfer.files[0];
+      if (file.path) {
+        document.getElementById('file-path').value = file.path;
+        switchTab('publish');
+        showToast('已识别拖入文件: ' + file.name, 'success');
+        return;
+      }
+      if (file.name) {
+        showToast('正在定位拖入文件: ' + file.name, 'info');
+        try {
+          const res = await fetch('/api/find-file?name=' + encodeURIComponent(file.name));
+          const data = await res.json();
+          if (data.found) {
+            document.getElementById('file-path').value = data.found;
+            switchTab('publish');
+            showToast('已定位文件路径: ' + data.found, 'success');
+          } else {
+            showToast('已检测到文件名 ' + file.name + '，建议点击“选择文件”直接选取', 'warning');
+            document.getElementById('file-path').value = file.name;
+          }
+        } catch (err) {
+          document.getElementById('file-path').value = file.name;
+        }
+      }
+    });
 
     // 初始化加载
     loadRecentNotes();
@@ -1901,6 +1966,30 @@ class DashboardHandler(BaseHTTPRequestHandler):
             else:
                 selected = pick_file_macos("选择笔记或Notebook文件", '{"md", "ipynb", "markdown"}')
             self.send_json({'path': selected})
+        elif url.path == '/api/find-file':
+            query = urllib.parse.parse_qs(url.query)
+            fname = query.get('name', [''])[0].strip()
+            found = ""
+            if fname:
+                home = Path.home()
+                search_dirs = [
+                    home / 'Desktop',
+                    home / 'Documents',
+                    home / 'Downloads',
+                    BLOG_ROOT,
+                ]
+                for sdir in search_dirs:
+                    if sdir.exists():
+                        try:
+                            for p in sdir.rglob(fname):
+                                if not any(part.startswith('.') for part in p.parts):
+                                    found = str(p.resolve())
+                                    break
+                            if found:
+                                break
+                        except Exception:
+                            pass
+            self.send_json({'found': found})
         else:
             self.send_error(404, "Not Found")
 
@@ -2013,6 +2102,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 if res.returncode != 0 and 'commit' not in cmd[1]:
                     success = False
                     break
+            self.send_json({'success': success, 'output': '\n'.join(full_output)})
+        elif url.path == '/api/git-pull':
+            cmd = ['git', 'pull', '--rebase', 'origin', 'main']
+            full_output = [f"$ {' '.join(cmd)}"]
+            res = subprocess.run(cmd, cwd=BLOG_ROOT, capture_output=True, text=True)
+            if res.stdout:
+                full_output.append(res.stdout)
+            if res.stderr:
+                full_output.append(res.stderr)
+            success = (res.returncode == 0)
             self.send_json({'success': success, 'output': '\n'.join(full_output)})
         else:
             self.send_error(404, "API Not Found")

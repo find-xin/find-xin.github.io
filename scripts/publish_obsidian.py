@@ -262,6 +262,75 @@ def delete_article(keyword: str):
     print(f"   git push origin main\n")
     return True
 
+CALLOUT_ICONS = {
+    'note': ('📌', 'Note', 'callout-note'),
+    'info': ('ℹ️', 'Info', 'callout-info'),
+    'tip': ('💡', 'Tip', 'callout-tip'),
+    'hint': ('💡', 'Hint', 'callout-tip'),
+    'important': ('✨', 'Important', 'callout-important'),
+    'warning': ('⚠️', 'Warning', 'callout-warning'),
+    'caution': ('⚠️', 'Caution', 'callout-warning'),
+    'danger': ('🚨', 'Danger', 'callout-danger'),
+    'error': ('🚨', 'Error', 'callout-danger'),
+    'quote': ('💬', 'Quote', 'callout-quote'),
+    'cite': ('💬', 'Cite', 'callout-quote'),
+    'example': ('🔮', 'Example', 'callout-example'),
+    'question': ('❓', 'Question', 'callout-question'),
+    'faq': ('❓', 'FAQ', 'callout-question'),
+    'todo': ('📝', 'Todo', 'callout-todo'),
+    'summary': ('📋', 'Summary', 'callout-summary'),
+    'abstract': ('📋', 'Abstract', 'callout-summary'),
+}
+
+def convert_obsidian_callouts(text: str) -> str:
+    """将 Obsidian > [!note] Callout 语法转换为语义化 HTML 卡片"""
+    lines = text.split('\n')
+    result = []
+    i = 0
+    n = len(lines)
+
+    while i < n:
+        line = lines[i]
+        m = re.match(r'^>\s*\[!([a-zA-Z0-9_-]+)\]([+-]?)(?:\s+(.*))?$', line)
+        if m:
+            c_type = m.group(1).lower()
+            c_collapse = m.group(2)
+            c_title = (m.group(3) or '').strip()
+            icon, default_title, c_class = CALLOUT_ICONS.get(c_type, ('📌', c_type.capitalize(), 'callout-note'))
+            final_title = c_title if c_title else default_title
+
+            body_lines = []
+            i += 1
+            while i < n and (lines[i].startswith('>') or lines[i].strip() == ''):
+                if re.match(r'^>\s*\[!([a-zA-Z0-9_-]+)\]', lines[i]):
+                    break
+                clean_l = re.sub(r'^>\s?', '', lines[i])
+                body_lines.append(clean_l)
+                i += 1
+
+            callout_body = '\n'.join(body_lines).strip()
+
+            if c_collapse == '-':
+                callout_html = (
+                    f'<details class="obsidian-callout {c_class}">\n'
+                    f'  <summary class="callout-header"><span class="callout-icon">{icon}</span><span class="callout-title">{final_title}</span></summary>\n'
+                    f'  <div class="callout-body">\n\n{callout_body}\n\n  </div>\n'
+                    f'</details>'
+                )
+            else:
+                callout_html = (
+                    f'<div class="obsidian-callout {c_class}">\n'
+                    f'  <div class="callout-header"><span class="callout-icon">{icon}</span><span class="callout-title">{final_title}</span></div>\n'
+                    f'  <div class="callout-body">\n\n{callout_body}\n\n  </div>\n'
+                    f'</div>'
+                )
+            result.append(callout_html)
+        else:
+            result.append(line)
+            i += 1
+
+    return '\n'.join(result)
+
 def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None, tags: list[str], category: str | None, draft: bool):
     if not md_path.exists():
         print(f"❌ 错误：找不到文件 {md_path}")
@@ -380,6 +449,12 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
         return match.group(0)
 
     new_body = re.sub(r'!\[(.*?)\]\((.*?)\)', replace_std_markdown_link, new_body)
+
+    # 5.5. 转换 Obsidian 文本高亮 ==内容== 为 HTML <mark>内容</mark>
+    new_body = re.sub(r'==([^=\n]+?)==', r'<mark>\1</mark>', new_body)
+
+    # 5.6. 转换 Obsidian Callout 标注块
+    new_body = convert_obsidian_callouts(new_body)
 
     # 6. 生成 Front Matter
     final_cover = fm.get('cover')

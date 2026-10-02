@@ -910,4 +910,14 @@
       img.insertAdjacentElement('afterend', caption);
     }
   });
+
+  // 18. External Links Security and Navigation Enhancement
+  document.querySelectorAll('.post-content a, .diary-detail-content a').forEach(a => {
+    const href = a.getAttribute('href');
+    if (href && (href.startsWith('http://') || href.startsWith('https://')) && !href.includes(window.location.hostname)) {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+      a.classList.add('external-link');
+    }
+  });
 })();

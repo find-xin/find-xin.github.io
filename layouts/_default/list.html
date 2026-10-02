@@ -11,10 +11,21 @@
     {{ end }}
   </header>
   {{ if eq .Section "search" }}
-    <form class="site-search" role="search"><label for="site-search-input">搜索文章</label><div><input id="site-search-input" type="search" name="q" placeholder="搜索标题或内容" autocomplete="off"><button type="submit">搜索</button></div></form>
-    <p class="search-status" aria-live="polite"></p><ol class="search-results"></ol>
-    {{ $documents := slice }}{{ range where site.RegularPages "Section" "ne" "search" }}{{ $documents = $documents | append (dict "title" .LinkTitle "url" .RelPermalink "text" (.Plain | htmlUnescape)) }}{{ end }}
-    <script id="search-index" type="application/json">{{ $documents | jsonify | safeHTML }}</script>
+    <form class="site-search" role="search">
+      <label for="site-search-input">全站极速检索</label>
+      <div class="site-search-input-wrap">
+        <input id="site-search-input" type="search" name="q" placeholder="输入关键词检索... 支持 @日记 或 Tab 切换分类" autocomplete="off" spellcheck="false">
+        <button type="submit" class="site-search-submit">搜索</button>
+      </div>
+      <div class="search-filter-pills" id="search-filter-pills" role="tablist" aria-label="搜索类型">
+        <button type="button" class="search-filter-pill is-active" data-filter="all">全部 <span class="pill-count" data-count="all"></span></button>
+        <button type="button" class="search-filter-pill" data-filter="posts"><span>📝</span> 文章 <span class="pill-count" data-count="posts"></span></button>
+        <button type="button" class="search-filter-pill" data-filter="diary"><span>☕</span> 日记 <span class="pill-count" data-count="diary"></span></button>
+        <button type="button" class="search-filter-pill" data-filter="gallery"><span>🖼️</span> 相册 <span class="pill-count" data-count="gallery"></span></button>
+      </div>
+    </form>
+    <p class="search-status" aria-live="polite"></p>
+    <div class="search-results"></div>
     {{ $searchJS := resources.Get "js/search.js" | minify | fingerprint }}<script src="{{ $searchJS.RelPermalink }}" integrity="{{ $searchJS.Data.Integrity }}" defer></script>
   {{ else if eq .Kind "taxonomy" }}
     <div class="term-grid">{{ range .Data.Terms.Alphabetical }}<a class="term-card" href="{{ .Page.RelPermalink }}"><span>{{ .Page.Title }}</span><small>{{ .Count }} 篇</small></a>{{ end }}</div>
