@@ -3081,6 +3081,28 @@ body.dark-mode .spotlight-item.is-active {
   border-color: rgba(255, 107, 107, 0.32);
 }
 
+@keyframes spotlightBoundaryBounceDown {
+  0% { transform: translateX(3px) translateY(0); }
+  35% { transform: translateX(3px) translateY(4px); }
+  70% { transform: translateX(3px) translateY(-1px); }
+  100% { transform: translateX(3px) translateY(0); }
+}
+
+@keyframes spotlightBoundaryBounceUp {
+  0% { transform: translateX(3px) translateY(0); }
+  35% { transform: translateX(3px) translateY(-4px); }
+  70% { transform: translateX(3px) translateY(1px); }
+  100% { transform: translateX(3px) translateY(0); }
+}
+
+.spotlight-item.boundary-bounce-down {
+  animation: spotlightBoundaryBounceDown 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.spotlight-item.boundary-bounce-up {
+  animation: spotlightBoundaryBounceUp 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 .spotlight-item-header {
   display: flex;
   align-items: center;

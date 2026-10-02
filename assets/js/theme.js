@@ -390,6 +390,67 @@
     });
   };
 
+  // 经典 macOS 碰壁回弹提示音 (Web Audio API 合成)
+  let lastBoundarySoundTime = 0;
+  const playBoundaryAlertSound = () => {
+    const nowTime = Date.now();
+    if (nowTime - lastBoundarySoundTime < 80) return;
+    lastBoundarySoundTime = nowTime;
+
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!window._boundaryAudioCtx) {
+        window._boundaryAudioCtx = new AudioCtx();
+      }
+      const ctx = window._boundaryAudioCtx;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(420, now);
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.exponentialRampToValueAtTime(65, now + 0.08);
+
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(110, now);
+      osc2.frequency.exponentialRampToValueAtTime(45, now + 0.08);
+
+      gain.gain.setValueAtTime(0.32, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
+
+      osc.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc2.start(now);
+      osc.stop(now + 0.085);
+      osc2.stop(now + 0.085);
+    } catch (_) {}
+  };
+
+  const triggerBoundaryAnimation = (direction, item) => {
+    if (!item) return;
+    const animClass = direction === 'down' ? 'boundary-bounce-down' : 'boundary-bounce-up';
+    item.classList.remove('boundary-bounce-down', 'boundary-bounce-up');
+    void item.offsetWidth;
+    item.classList.add(animClass);
+    setTimeout(() => {
+      item.classList.remove(animClass);
+    }, 180);
+  };
+
   if (spotlightInput) {
     spotlightInput.addEventListener('input', (e) => {
       performSearch(e.target.value);
@@ -401,12 +462,30 @@
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        activeIndex = (activeIndex + 1) % items.length;
-        updateActiveItem(items);
+        if (activeIndex < 0) {
+          activeIndex = 0;
+          updateActiveItem(items);
+        } else if (activeIndex < items.length - 1) {
+          activeIndex++;
+          updateActiveItem(items);
+        } else {
+          // 翻到最后一项后如果还往下，一直卡在最后一项，并播放经典提示音
+          playBoundaryAlertSound();
+          triggerBoundaryAnimation('down', items[activeIndex]);
+        }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        activeIndex = (activeIndex - 1 + items.length) % items.length;
-        updateActiveItem(items);
+        if (activeIndex < 0) {
+          activeIndex = 0;
+          updateActiveItem(items);
+        } else if (activeIndex > 0) {
+          activeIndex--;
+          updateActiveItem(items);
+        } else {
+          // 翻到最前面一项后如果还在往上，一直卡在第一项，并播放经典提示音
+          playBoundaryAlertSound();
+          triggerBoundaryAnimation('up', items[activeIndex]);
+        }
       } else if (e.key === 'Enter') {
         e.preventDefault();
         if (activeIndex >= 0 && items[activeIndex]) {
