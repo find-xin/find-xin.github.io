@@ -1,0 +1,136 @@
+{{ define "main" }}
+<section class="posts-page shell">
+  <header class="posts-header">
+    <div class="posts-header-top">
+      <div>
+        <p class="posts-eyebrow">ARTICLES · 深度博文</p>
+        <h1 class="posts-title">{{ .Title }}</h1>
+        <p class="posts-desc">{{ .Description | default "记录系统设计、技术实践、读书思考与长篇创作。" }}</p>
+      </div>
+      <div class="posts-header-actions">
+        <div class="posts-stats-badge">
+          <span>📝 共 {{ len .Pages }} 篇文章</span>
+        </div>
+        <a class="posts-archive-link" href="{{ "archive/" | relURL }}" title="查看按年份整理的时间轴归档">
+          <span>⌛ 查看时间轴归档 →</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Collect categories dynamically for the toolbar -->
+    {{ $allCats := slice }}
+    {{ range .Pages }}
+      {{ with .Params.categories }}
+        {{ range . }}
+          {{ $allCats = $allCats | append . }}
+        {{ end }}
+      {{ end }}
+    {{ end }}
+    {{ $allCats = $allCats | uniq }}
+
+    <div class="posts-toolbar">
+      <div class="posts-filter-tabs" role="tablist" aria-label="文章分类">
+        <button class="posts-filter-tab active" type="button" data-cat="all">✨ 全部</button>
+        {{ range $allCats }}
+          <button class="posts-filter-tab" type="button" data-cat="{{ . }}">📁 {{ . }}</button>
+        {{ end }}
+      </div>
+    </div>
+  </header>
+
+  <div class="posts-grid" id="posts-grid-container">
+    {{ range .Pages.ByDate.Reverse }}
+      {{ $post := . }}
+      {{ $catString := delimit (.Params.categories | default slice) "," }}
+      {{ $tagString := delimit (.Params.tags | default slice) "," }}
+      {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
+      <article class="posts-card" data-cats="{{ $catString }}" data-tags="{{ $tagString }}">
+        {{ if $coverUrl }}
+          <div class="posts-card-cover-wrap">
+            <div class="posts-card-badges">
+              {{ if .Params.pinned }}<span class="posts-badge posts-badge-pinned">置顶</span>{{ end }}
+              {{ range first 1 (.GetTerms "categories") }}
+                <span class="posts-badge posts-badge-cat">{{ .LinkTitle }}</span>
+              {{ end }}
+            </div>
+            <a href="{{ .RelPermalink }}" tabindex="-1" aria-hidden="true">
+              <img src="{{ $coverUrl }}" alt="{{ .Title }}" loading="lazy">
+            </a>
+          </div>
+        {{ end }}
+
+        <div class="posts-card-body">
+          <div class="posts-card-meta-top">
+            {{ if not $coverUrl }}
+              <div class="posts-card-badges-inline">
+                {{ if .Params.pinned }}<span class="posts-badge posts-badge-pinned">置顶</span>{{ end }}
+                {{ range first 1 (.GetTerms "categories") }}
+                  <a class="posts-card-category-link" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
+                {{ end }}
+              </div>
+            {{ else }}
+              {{ range first 1 (.GetTerms "categories") }}
+                <a class="posts-card-category-link" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
+              {{ end }}
+            {{ end }}
+            <time class="posts-card-date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time>
+          </div>
+
+          <h2 class="posts-card-title">
+            <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+          </h2>
+
+          {{ with (.Summary | default .Description) }}
+            <p class="posts-card-summary">{{ . | plainify | truncate 95 }}</p>
+          {{ end }}
+
+          <div class="posts-card-footer">
+            <div class="posts-card-tags">
+              {{ if gt .WordCount 0 }}
+                <span class="posts-card-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟</span>
+              {{ end }}
+              {{ with .Params.tags }}
+                {{ range first 2 . }}
+                  <span class="posts-card-tag">#{{ . }}</span>
+                {{ end }}
+              {{ end }}
+            </div>
+            <a class="posts-card-readmore" href="{{ .RelPermalink }}" aria-label="阅读全文：{{ .Title }}">
+              <span>阅读全文 →</span>
+            </a>
+          </div>
+        </div>
+      </article>
+    {{ end }}
+  </div>
+</section>
+
+<script>
+  (() => {
+    const filterTabs = document.querySelectorAll('.posts-filter-tab');
+    const cards = document.querySelectorAll('#posts-grid-container .posts-card');
+    if (!filterTabs.length || !cards.length) return;
+
+    filterTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        filterTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const selectedCat = tab.dataset.cat;
+
+        cards.forEach(card => {
+          if (selectedCat === 'all') {
+            card.style.display = 'flex';
+          } else {
+            const cats = (card.dataset.cats || '').split(',').map(c => c.trim());
+            if (cats.includes(selectedCat)) {
+              card.style.display = 'flex';
+            } else {
+              card.style.display = 'none';
+            }
+          }
+        });
+      });
+    });
+  })();
+</script>
+{{ end }}

@@ -56,7 +56,7 @@
       <span class="section-eyebrow">RECENT WRITINGS</span>
       <h2 class="section-title">最新文章</h2>
     </div>
-    <a class="section-more-link" href="{{ "posts/" | relURL }}">全部归档 <span>→</span></a>
+    <a class="section-more-link" href="{{ "posts/" | relURL }}">全部文章 <span>→</span></a>
   </div>
   <div class="articles-grid{{ if le (len $posts) 3 }} articles-grid--few{{ end }}">
     {{ range $index, $post := $posts }}
