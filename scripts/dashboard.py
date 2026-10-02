@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-dashboard.py - 博客本地可视化控制台 (Web UI)
-无需任何外部依赖，启动后自动打开浏览器。
-支持：
-1. 可视化发布 Obsidian 笔记 (.md) 与 Jupyter Notebook (.ipynb)
-2. 全站文章管理（实时搜索、一键下架/重新上架、一键删除）
-3. 一键提交并推送到 GitHub
-4. 本地 Hugo 服务一键启停与预览
+dashboard.py - 博客桌面级可视化管理后台 (Web Dashboard 2.0)
+零外部依赖，开箱即用，双击直接启动。
+功能：
+1. ✍️ 发布工作台：支持 Obsidian 笔记 (.md 带附件) 与 Jupyter Notebook (.ipynb)，带 macOS 原生文件选择器与一键转换
+2. 🖼️ 光影相册管理：可视化管理多分区相册（摄影 / 日常 / 动漫），自动测量宽高比、转 WebP、编号并写入 gallery.yaml
+3. 📚 全站文章管理：实时检索、缩略图展示、一键下架/重新上架、安全删除
+4. 🚀 一键部署上线：Git 状态检测、预设提交说明、一键推送到 GitHub 并触发自动构建
+5. ⚡ Hugo 本地服务：顶栏一键启停 Hugo 本地预览服务 (端口 1314)
 """
 
 from __future__ import annotations
@@ -19,12 +20,14 @@ import webbrowser
 import subprocess
 import shutil
 import socket
+import re
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # 导入核心发布与管理模块
 CURRENT_DIR = Path(__file__).resolve().parent
 BLOG_ROOT = CURRENT_DIR.parent
+GALLERY_YAML = BLOG_ROOT / 'data' / 'gallery.yaml'
 sys.path.insert(0, str(CURRENT_DIR))
 from publish_obsidian import (
     get_all_articles,
@@ -36,6 +39,19 @@ from publish_obsidian import (
 
 PORT = 2026
 HUGO_PROCESS = None
+
+MIME_TYPES = {
+    '.webp': 'image/webp',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.html': 'text/html; charset=utf-8'
+}
 
 def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -79,6 +95,192 @@ def stop_hugo_server():
         pass
     return True, "已停止 Hugo 服务"
 
+def pick_file_macos(prompt="选择文件", file_types='{"md", "ipynb", "markdown"}') -> str:
+    """调用 macOS 系统级原生文件选择框"""
+    try:
+        script = f'''
+        try
+            tell application "System Events"
+                activate
+            end tell
+            set selectedFile to choose file of type {file_types} with prompt "{prompt}"
+            return POSIX path of selectedFile
+        on error
+            return ""
+        end try
+        '''
+        res = subprocess.run(['osascript', '-e', script], capture_output=True, text=True, timeout=60)
+        return res.stdout.strip()
+    except Exception:
+        return ""
+
+def get_image_info(img_path: Path):
+    """使用 macOS 内置的 sips 工具提取图片真实宽高与长宽比"""
+    try:
+        res = subprocess.run(
+            ['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', str(img_path)],
+            capture_output=True,
+            text=True
+        )
+        w_match = re.search(r'pixelWidth:\s*(\d+)', res.stdout)
+        h_match = re.search(r'pixelHeight:\s*(\d+)', res.stdout)
+        if w_match and h_match:
+            width = int(w_match.group(1))
+            height = int(h_match.group(1))
+            ratio = round(width / height, 4) if height > 0 else 1.0
+            return width, height, ratio
+    except Exception:
+        pass
+    return 1000, 1000, 1.0
+
+def get_gallery_images():
+    """解析 data/gallery.yaml 获取相册列表"""
+    if not GALLERY_YAML.exists():
+        return []
+    content = GALLERY_YAML.read_text(encoding='utf-8')
+    items = []
+    blocks = re.split(r'\n(?=  - image:)', content)
+    for b in blocks:
+        if 'image:' not in b:
+            continue
+        item = {}
+        for line in b.strip().splitlines():
+            line = line.strip()
+            if line.startswith('- image:') or line.startswith('image:'):
+                item['image'] = line.split('image:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('ratio:'):
+                try:
+                    item['ratio'] = float(line.split('ratio:', 1)[1].strip())
+                except:
+                    item['ratio'] = 1.0
+            elif line.startswith('number:'):
+                item['number'] = line.split('number:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('category:'):
+                item['category'] = line.split('category:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('caption:'):
+                item['caption'] = line.split('caption:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('tags:'):
+                raw = line.split('tags:', 1)[1].strip().strip('[]')
+                item['tags'] = [t.strip().strip('\"\'') for t in raw.split(',') if t.strip()]
+        if 'image' in item:
+            items.append(item)
+    return items
+
+def get_next_number(category: str, items: list):
+    cat_items = [it for it in items if it.get('category') == category]
+    max_num = 0
+    for it in cat_items:
+        num_str = it.get('number', '')
+        digits = re.findall(r'\d+', num_str)
+        if digits:
+            max_num = max(max_num, int(digits[0]))
+    next_idx = max_num + 1
+    if category == 'photography':
+        return f'p{next_idx:02d}', f'photo-{next_idx:02d}'
+    elif category == 'daily':
+        return f'd{next_idx:02d}', f'daily-{next_idx:02d}'
+    else:
+        return f'{next_idx:02d}', f'collection-{next_idx:02d}'
+
+def insert_gallery_entry(yaml_text: str, category: str, new_block: str) -> str:
+    if category == 'anime':
+        pattern = r'(# =+\s*\n\s*# 2\..*?\n\s*# =+)'
+        match = re.search(pattern, yaml_text)
+        if match:
+            idx = match.start()
+            return yaml_text[:idx] + new_block.rstrip() + '\n\n  ' + yaml_text[idx:]
+    elif category == 'photography':
+        pattern = r'(# =+\s*\n\s*# 3\..*?\n\s*# =+)'
+        match = re.search(pattern, yaml_text)
+        if match:
+            idx = match.start()
+            return yaml_text[:idx] + new_block.rstrip() + '\n\n  ' + yaml_text[idx:]
+    return yaml_text.rstrip() + '\n' + new_block.rstrip() + '\n'
+
+def remove_gallery_entry(yaml_text: str, image_url: str) -> tuple[str, int]:
+    pattern = rf'[ \t]*- image:\s*[\"\'\s]*{re.escape(image_url)}[\"\'\s]*[\s\S]*?(?=(?:[ \t]*- image:|\n\s*# =+|\Z))'
+    new_text, count = re.subn(pattern, '', yaml_text)
+    new_text = re.sub(r'\n{3,}', '\n\n', new_text)
+    return new_text, count
+
+def add_gallery_image(raw_path: str, category: str, caption: str, tags: list[str]) -> tuple[bool, str]:
+    src = Path(raw_path).expanduser().resolve()
+    if not src.exists() or not src.is_file():
+        return False, f"找不到图片文件：{raw_path}"
+    
+    valid_exts = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.gif'}
+    if src.suffix.lower() not in valid_exts:
+        return False, f"不支持的格式：{src.suffix}（仅支持常见图片）"
+
+    w, h, ratio = get_image_info(src)
+    gallery_items = get_gallery_images()
+
+    if category == 'photography':
+        dest_dir = BLOG_ROOT / 'static' / 'images' / 'photography'
+        num_str, prefix = get_next_number('photography', gallery_items)
+        rel_img_url = f"/images/photography/{prefix}.webp"
+    elif category == 'daily':
+        dest_dir = BLOG_ROOT / 'static' / 'images' / 'daily'
+        num_str, prefix = get_next_number('daily', gallery_items)
+        rel_img_url = f"/images/daily/{prefix}.webp"
+    else:
+        category = 'anime'
+        dest_dir = BLOG_ROOT / 'static' / 'images' / 'gallery'
+        num_str, prefix = get_next_number('anime', gallery_items)
+        rel_img_url = f"/images/gallery/{prefix}.webp"
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_file = dest_dir / f"{prefix}.webp"
+
+    cwebp = shutil.which('cwebp') or '/opt/homebrew/bin/cwebp'
+    converted = False
+    if src.suffix.lower() == '.webp':
+        shutil.copy2(src, dest_file)
+        converted = True
+    elif os.path.exists(cwebp):
+        try:
+            res = subprocess.run([cwebp, '-q', '85', str(src), '-o', str(dest_file)], capture_output=True, text=True)
+            if res.returncode == 0 and dest_file.exists():
+                converted = True
+        except Exception:
+            pass
+
+    if not converted:
+        shutil.copy2(src, dest_file)
+
+    tags_formatted = json.dumps(tags, ensure_ascii=False)
+    caption_clean = caption.replace("'", "''")
+    yaml_block = f"""  - image: {rel_img_url}
+    ratio: {ratio:.4f}
+    number: "{num_str}"
+    category: "{category}"
+    caption: '{caption_clean}'
+    tags: {tags_formatted}
+    source: '{src.name}'"""
+
+    content = GALLERY_YAML.read_text(encoding='utf-8')
+    new_content = insert_gallery_entry(content, category, yaml_block)
+    GALLERY_YAML.write_text(new_content, encoding='utf-8')
+
+    return True, f"成功加入相册！编号：{num_str}，文件：{rel_img_url}（长宽比：{ratio}）"
+
+def delete_gallery_image(image_url: str) -> tuple[bool, str]:
+    if not GALLERY_YAML.exists():
+        return False, "找不到 data/gallery.yaml"
+    content = GALLERY_YAML.read_text(encoding='utf-8')
+    new_content, count = remove_gallery_entry(content, image_url)
+    if count == 0:
+        return False, "未在相册中找到该图片记录"
+    GALLERY_YAML.write_text(new_content, encoding='utf-8')
+    
+    local_file = (BLOG_ROOT / 'static' / image_url.lstrip('/')).resolve()
+    if local_file.exists() and local_file.is_file():
+        try:
+            local_file.unlink()
+        except Exception:
+            pass
+    return True, "已成功从相册中移除"
+
 def get_git_status():
     try:
         res = subprocess.run(
@@ -109,35 +311,49 @@ HTML_PAGE = """<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>find-xin 博客可视化控制台</title>
+  <title>有珠之夜 · 博客管理控制台</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
   <style>
     :root {
       --bg: #f8fafc;
       --card-bg: #ffffff;
+      --card-subtle: #f1f5f9;
       --text: #0f172a;
       --text-muted: #64748b;
       --border: #e2e8f0;
+      --border-focus: #6366f1;
       --primary: #4f46e5;
       --primary-hover: #4338ca;
-      --accent: #ff4757;
+      --primary-soft: rgba(79, 70, 229, 0.08);
+      --accent: #ef4444;
+      --accent-soft: rgba(239, 68, 68, 0.08);
       --success: #10b981;
+      --success-soft: rgba(16, 185, 129, 0.1);
       --warning: #f59e0b;
-      --code-bg: #0f172a;
-      --code-text: #f8fafc;
+      --warning-soft: rgba(245, 158, 11, 0.1);
+      --code-bg: #090d16;
+      --code-text: #e2e8f0;
       --radius: 12px;
-      --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.06);
     }
     body.dark {
-      --bg: #0b0f19;
-      --card-bg: #131b2e;
-      --text: #f1f5f9;
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-subtle: #1a2234;
+      --text: #f8fafc;
       --text-muted: #94a3b8;
-      --border: #1e293b;
+      --border: #1f293d;
+      --border-focus: #818cf8;
       --primary: #6366f1;
       --primary-hover: #4f46e5;
-      --code-bg: #070b14;
-      --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
+      --primary-soft: rgba(99, 102, 241, 0.15);
+      --accent-soft: rgba(239, 68, 68, 0.15);
+      --success-soft: rgba(16, 185, 129, 0.15);
+      --warning-soft: rgba(245, 158, 11, 0.15);
+      --code-bg: #04060a;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.4);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -145,23 +361,34 @@ HTML_PAGE = """<!DOCTYPE html>
       background: var(--bg);
       color: var(--text);
       line-height: 1.5;
-      transition: background 0.3s ease, color 0.3s ease;
+      transition: background 0.25s ease, color 0.25s ease;
+      min-height: 100vh;
     }
+    
+    /* 顶部导航条 */
     .header {
       background: var(--card-bg);
       border-bottom: 1px solid var(--border);
-      padding: 14px 28px;
+      padding: 12px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: sticky;
       top: 0;
       z-index: 50;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      box-shadow: var(--shadow-sm);
     }
-    .header-left { display: flex; align-items: center; gap: 14px; }
-    .brand-title { font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-    .brand-title span { color: var(--accent); }
+    .header-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .brand-title {
+      font-size: 1.18rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.3px;
+    }
+    .brand-title span { color: #f43f5e; }
+    
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -169,41 +396,57 @@ HTML_PAGE = """<!DOCTYPE html>
       font-size: 0.8rem;
       padding: 4px 10px;
       border-radius: 99px;
-      background: rgba(16, 185, 129, 0.1);
+      background: var(--success-soft);
       color: var(--success);
       font-weight: 500;
     }
-    .status-badge.stopped { background: rgba(100, 116, 139, 0.1); color: var(--text-muted); }
+    .status-badge.stopped { background: var(--card-subtle); color: var(--text-muted); }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
+    
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    
+    /* 统一按钮设计 */
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 8px;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 500;
       cursor: pointer;
       border: 1px solid var(--border);
       background: var(--card-bg);
       color: var(--text);
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       text-decoration: none;
+      white-space: nowrap;
     }
-    .btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-1px); }
-    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-    .btn-primary:hover { background: var(--primary-hover); color: #fff; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); }
+    .btn:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff !important;
+      border-color: var(--primary);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.28);
+    }
     .btn-danger { color: var(--accent); }
-    .btn-danger:hover { background: rgba(255, 71, 87, 0.1); border-color: var(--accent); }
+    .btn-danger:hover { background: var(--accent-soft); border-color: var(--accent); }
     .btn-sm { padding: 4px 10px; font-size: 0.82rem; border-radius: 6px; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-    .container { max-width: 1100px; margin: 28px auto; padding: 0 20px; }
+    /* 主容器与 Tab 切换 */
+    .container { max-width: 1140px; margin: 24px auto; padding: 0 20px 48px; }
+    
     .nav-tabs {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       border-bottom: 1px solid var(--border);
       margin-bottom: 24px;
+      overflow-x: auto;
     }
     .tab-btn {
       padding: 10px 18px;
@@ -215,6 +458,10 @@ HTML_PAGE = """<!DOCTYPE html>
       cursor: pointer;
       position: relative;
       transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
     }
     .tab-btn:hover { color: var(--text); }
     .tab-btn.active { color: var(--primary); }
@@ -228,20 +475,68 @@ HTML_PAGE = """<!DOCTYPE html>
       background: var(--primary);
       border-radius: 2px 2px 0 0;
     }
+    .tab-counter {
+      font-size: 0.72rem;
+      background: var(--card-subtle);
+      color: var(--text-muted);
+      padding: 2px 6px;
+      border-radius: 99px;
+    }
 
+    /* 模块卡片 */
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 24px;
       margin-bottom: 24px;
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow-sm);
     }
-    .card-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-top: -8px;
+      margin-bottom: 18px;
+    }
     
+    /* 统计徽标卡 */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--card-subtle);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .stat-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+    .stat-val { font-size: 1.35rem; font-weight: 700; color: var(--text); }
+
+    /* 表单组件 */
     .form-group { margin-bottom: 18px; }
-    .form-label { display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px; color: var(--text); }
-    .form-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+    .form-label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .form-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
     .form-input {
       width: 100%;
       padding: 10px 14px;
@@ -251,26 +546,55 @@ HTML_PAGE = """<!DOCTYPE html>
       color: var(--text);
       font-size: 0.92rem;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+    .form-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+    .input-with-button {
+      display: flex;
+      gap: 8px;
+    }
+    .input-with-button .form-input { flex: 1; }
     
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 680px) { .grid-2 { grid-template-columns: 1fr; } }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    @media (max-width: 720px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
 
-    .chip-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    /* 快捷标签 Pills */
+    .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .chip {
-      padding: 4px 10px;
+      padding: 3px 10px;
       border-radius: 99px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       border: 1px solid var(--border);
-      background: var(--bg);
+      background: var(--card-subtle);
       cursor: pointer;
       color: var(--text-muted);
-      transition: all 0.2s;
+      transition: all 0.15s;
+      user-select: none;
     }
     .chip:hover { border-color: var(--primary); color: var(--primary); }
 
+    /* 步进向导序号 */
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+
+    /* 终端输出框 */
     .terminal-box {
       background: var(--code-bg);
       color: var(--code-text);
@@ -279,19 +603,21 @@ HTML_PAGE = """<!DOCTYPE html>
       font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 0.86rem;
       line-height: 1.6;
-      max-height: 240px;
+      max-height: 280px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;
       margin-top: 14px;
+      border: 1px solid var(--border);
       display: none;
     }
 
+    /* 表格样式 */
     .table-responsive { width: 100%; overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); }
-    th { font-weight: 600; color: var(--text-muted); background: var(--bg); }
-    tr:hover td { background: rgba(99, 102, 241, 0.03); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    th { font-weight: 600; color: var(--text-muted); background: var(--card-subtle); }
+    tr:hover td { background: var(--primary-soft); }
 
     .badge {
       display: inline-block;
@@ -300,18 +626,118 @@ HTML_PAGE = """<!DOCTYPE html>
       font-size: 0.76rem;
       font-weight: 600;
     }
-    .badge-post { background: rgba(99, 102, 241, 0.12); color: var(--primary); }
-    .badge-diary { background: rgba(245, 158, 11, 0.12); color: var(--warning); }
-    .badge-active { background: rgba(16, 185, 129, 0.12); color: var(--success); }
-    .badge-draft { background: rgba(100, 116, 139, 0.15); color: var(--text-muted); }
+    .badge-post { background: var(--primary-soft); color: var(--primary); }
+    .badge-diary { background: var(--warning-soft); color: var(--warning); }
+    .badge-anime { background: rgba(168, 85, 247, 0.12); color: #a855f7; }
+    .badge-active { background: var(--success-soft); color: var(--success); }
+    .badge-draft { background: var(--card-subtle); color: var(--text-muted); }
 
-    .article-thumb { width: 44px; height: 32px; border-radius: 4px; object-fit: cover; vertical-align: middle; margin-right: 8px; }
+    /* 相册网格图墙 */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .gallery-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .gallery-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-focus);
+    }
+    .gallery-card-img-wrap {
+      width: 100%;
+      height: 160px;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+    .gallery-card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.3s;
+    }
+    .gallery-card:hover .gallery-card-img { transform: scale(1.04); }
+    .gallery-card-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      backdrop-filter: blur(4px);
+    }
+    .gallery-card-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      justify-content: space-between;
+    }
+    .gallery-card-title {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .gallery-card-meta {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .gallery-card-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+    
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-pill {
+      padding: 6px 14px;
+      border-radius: 99px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .filter-pill.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
   </style>
 </head>
 <body>
   <header class="header">
     <div class="header-left">
-      <div class="brand-title"><span>✦</span> 博客管理台</div>
+      <div class="brand-title"><span>✦</span> 有珠之夜 · 博客管理台</div>
       <div id="hugo-status-badge" class="status-badge">
         <span class="status-dot"></span>
         <span id="hugo-status-text">检测 Hugo 服务中...</span>
@@ -319,7 +745,7 @@ HTML_PAGE = """<!DOCTYPE html>
       <button class="btn btn-sm" id="hugo-toggle-btn" onclick="toggleHugo()">▶️ 启动 Hugo</button>
     </div>
     <div class="header-right">
-      <a class="btn" href="http://localhost:1314/" target="_blank" rel="noopener">🌐 本地预览</a>
+      <a class="btn" href="http://localhost:1314/" target="_blank" rel="noopener">🌐 本地预览 (1314)</a>
       <a class="btn" href="https://find-xin.github.io/" target="_blank" rel="noopener">🚀 线上站点</a>
       <button class="btn btn-sm" id="theme-btn" onclick="toggleTheme()">🌓 模式</button>
     </div>
@@ -327,40 +753,65 @@ HTML_PAGE = """<!DOCTYPE html>
 
   <main class="container">
     <nav class="nav-tabs">
-      <button class="tab-btn active" onclick="switchTab('publish')">✍️ 发布笔记 / Notebook</button>
-      <button class="tab-btn" onclick="switchTab('manage')">📚 全站文章管理</button>
-      <button class="tab-btn" onclick="switchTab('deploy')">🚀 部署到 GitHub</button>
+      <button class="tab-btn active" onclick="switchTab('publish')">
+        <span>✍️ 发布文章 / 笔记</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('gallery')">
+        <span>🖼️ 光影相册管理</span>
+        <span class="tab-counter" id="gallery-counter">43</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('manage')">
+        <span>📚 全站文章管理</span>
+        <span class="tab-counter" id="articles-counter">--</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('deploy')">
+        <span>🚀 部署到 GitHub</span>
+      </button>
     </nav>
 
-    <!-- TAB 1: 发布工作台 -->
+    <!-- ========================================== -->
+    <!-- TAB 1: ✍️ 发布工作台 -->
+    <!-- ========================================== -->
     <section id="tab-publish">
       <div class="card">
-        <h2 class="card-title">📝 一键导入与发布</h2>
+        <h2 class="card-title">
+          <span><span class="step-badge">1</span> 选择笔记或 Notebook 文件</span>
+        </h2>
+        <p class="card-desc">支持 Obsidian Markdown 笔记（自动提取 attachments/ 并转为 WebP）或 Jupyter Notebook（.ipynb，自动抽取代码与图表）。</p>
         
         <div class="form-group">
-          <label class="form-label">笔记文件路径（支持 Obsidian .md 或 Jupyter .ipynb）</label>
-          <input type="text" id="file-path" class="form-input" placeholder="例如：/Users/xin/Desktop/Notes/我的文章.md 或 /path/to/demo.ipynb">
-          <p class="form-hint">💡 技巧：在 macOS Finder 里选中你的笔记或 .ipynb 文件，按下快捷键 <code>Option + Command + C</code> 即可直接复制绝对路径，粘贴到此处即可。</p>
+          <label class="form-label">笔记绝对路径</label>
+          <div class="input-with-button">
+            <input type="text" id="file-path" class="form-input" placeholder="点击右侧按钮选择文件，或粘贴绝对路径...">
+            <button class="btn btn-primary" onclick="pickFile('note')">📂 浏览电脑文件...</button>
+          </div>
+          <p class="form-hint">💡 也可以在访达（Finder）中选中文件按 <code>Option + Command + C</code> 快速复制路径后直接粘贴。</p>
         </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">
+          <span><span class="step-badge">2</span> 配置发布属性</span>
+        </h2>
 
         <div class="grid-2">
           <div class="form-group">
-            <label class="form-label">发布类型</label>
+            <label class="form-label">发布所属板块</label>
             <select id="pub-type" class="form-input">
-              <option value="post">长篇博文（Post · content/posts/）</option>
-              <option value="diary">微光日记（Diary · content/diary/）</option>
+              <option value="post">📄 长篇博文（Post · content/posts/）</option>
+              <option value="diary">☕ 生活微光日记（Diary · content/diary/）</option>
             </select>
           </div>
           <div class="form-group">
             <label class="form-label">英文文件夹别名（Slug，可选）</label>
-            <input type="text" id="pub-slug" class="form-input" placeholder="留空则自动根据标题或时间戳生成">
+            <input type="text" id="pub-slug" class="form-input" placeholder="留空则自动按时间戳或标题拼音生成">
           </div>
         </div>
 
         <div class="grid-2">
           <div class="form-group">
             <label class="form-label">分类（可选）</label>
-            <input type="text" id="pub-category" class="form-input" placeholder="例如：技术、型月、数据科学">
+            <input type="text" id="pub-category" class="form-input" placeholder="例如：型月、技术、数据科学">
             <div class="chip-group">
               <span class="chip" onclick="setCategory('型月')">型月</span>
               <span class="chip" onclick="setCategory('技术')">技术</span>
@@ -370,19 +821,19 @@ HTML_PAGE = """<!DOCTYPE html>
           </div>
           <div class="form-group">
             <label class="form-label">标签（逗号分隔，可选）</label>
-            <input type="text" id="pub-tags" class="form-input" placeholder="例如：魔法使之夜,Python,教程">
+            <input type="text" id="pub-tags" class="form-input" placeholder="例如：魔法使之夜,Python,随想">
             <div class="chip-group">
-              <span class="chip" onclick="addTag('Python')">+ Python</span>
-              <span class="chip" onclick="addTag('Obsidian')">+ Obsidian</span>
               <span class="chip" onclick="addTag('魔法使之夜')">+ 魔法使之夜</span>
-              <span class="chip" onclick="addTag('随想')">+ 随想</span>
+              <span class="chip" onclick="addTag('Python')">+ Python</span>
+              <span class="chip" onclick="addTag('随笔')">+ 随笔</span>
+              <span class="chip" onclick="addTag('教程')">+ 教程</span>
             </div>
           </div>
         </div>
 
-        <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+        <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
           <input type="checkbox" id="pub-draft" style="width: 18px; height: 18px; cursor: pointer;">
-          <label for="pub-draft" style="font-size: 0.92rem; cursor: pointer;">保存为草稿（仅本地可见，暂不在线上公开）</label>
+          <label for="pub-draft" style="font-size: 0.92rem; cursor: pointer; user-select: none;">保存为本地草稿（仅本地可见，暂不推送到线上）</label>
         </div>
 
         <div style="margin-top: 24px;">
@@ -395,50 +846,141 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
     </section>
 
-    <!-- TAB 2: 全站文章管理 -->
-    <section id="tab-manage" style="display: none;">
+    <!-- ========================================== -->
+    <!-- TAB 2: 🖼️ 光影相册管理 (NEW!) -->
+    <!-- ========================================== -->
+    <section id="tab-gallery" style="display: none;">
+      <!-- 添加新相片表单 -->
       <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <h2 class="card-title">📸 添加新相片到相册</h2>
+        <p class="card-desc">自动使用 macOS 底层引擎提取真实宽高比（Ratio）、转换为高压缩比 WebP、自动按序分配编号，并写入相册数据库。</p>
+
+        <div class="form-group">
+          <label class="form-label">选择图片文件（PNG / JPG / JPEG / WebP）</label>
+          <div class="input-with-button">
+            <input type="text" id="gallery-file-path" class="form-input" placeholder="点击右侧按钮选择图片，或输入图片绝对路径...">
+            <button class="btn btn-primary" onclick="pickFile('image')">📂 选择图片文件...</button>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="form-group">
+            <label class="form-label">所属相册分类</label>
+            <select id="gallery-cat" class="form-input">
+              <option value="anime">🎨 动漫插画 (Anime · collection-XX.webp)</option>
+              <option value="photography">📷 摄影大片 (Photography · photo-XX.webp)</option>
+              <option value="daily">☕ 生活日常 (Daily · daily-XX.webp)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">作品标题 / 描述 (Caption)</label>
+            <input type="text" id="gallery-caption" class="form-input" placeholder="例如：苍崎青子·魔弹 或 雨后街角">
+          </div>
+          <div class="form-group">
+            <label class="form-label">标签 (逗号分隔)</label>
+            <input type="text" id="gallery-tags" class="form-input" placeholder="例如：魔法使之夜,型月,壁纸">
+          </div>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <button class="btn btn-primary" id="add-gallery-btn" onclick="doAddGallery()">
+            ✨ 自动测量宽高、转码并加入相册
+          </button>
+        </div>
+
+        <div id="gallery-log" class="terminal-box"></div>
+      </div>
+
+      <!-- 相册图片展示墙 -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <h2 class="card-title" style="margin-bottom: 0;">🖼️ 已收录相册一览</h2>
+          <div class="filter-pills" style="margin-bottom: 0;">
+            <button class="filter-pill active" onclick="filterGallery('all', this)">全部 (<span id="count-all">0</span>)</button>
+            <button class="filter-pill" onclick="filterGallery('anime', this)">🎨 动漫 (<span id="count-anime">0</span>)</button>
+            <button class="filter-pill" onclick="filterGallery('photography', this)">📷 摄影 (<span id="count-photo">0</span>)</button>
+            <button class="filter-pill" onclick="filterGallery('daily', this)">☕ 日常 (<span id="count-daily">0</span>)</button>
+          </div>
+        </div>
+
+        <div class="gallery-grid" id="gallery-grid">
+          <div style="grid-column: 1/-1; text-align: center; padding: 30px; color: var(--text-muted);">正在加载相册数据...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: 📚 全站文章管理 -->
+    <!-- ========================================== -->
+    <section id="tab-manage" style="display: none;">
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-label">📄 长篇博文总数</span>
+          <span class="stat-val" id="stat-posts">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">☕ 微光日记篇数</span>
+          <span class="stat-val" id="stat-diaries">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">🟡 当前草稿数量</span>
+          <span class="stat-val" id="stat-drafts">0</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
           <h2 class="card-title" style="margin-bottom: 0;">📚 已发布内容一览</h2>
           <button class="btn btn-sm" onclick="loadArticles()">🔄 刷新列表</button>
         </div>
         <div class="form-group">
-          <input type="text" id="search-input" class="form-input" placeholder="实时过滤标题、类型或 Slug..." oninput="filterArticles()">
+          <input type="text" id="search-input" class="form-input" placeholder="输入关键词实时过滤标题、类型或 Slug..." oninput="filterArticles()">
         </div>
         <div class="table-responsive">
           <table>
             <thead>
               <tr>
-                <th>类型</th>
-                <th>状态</th>
-                <th>日期</th>
+                <th style="width: 80px;">类型</th>
+                <th style="width: 90px;">状态</th>
+                <th style="width: 110px;">日期</th>
                 <th>文章标题</th>
-                <th>Slug</th>
-                <th>快捷操作</th>
+                <th style="width: 180px;">Slug 标识</th>
+                <th style="width: 200px;">快捷操作</th>
               </tr>
             </thead>
             <tbody id="articles-tbody">
-              <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">正在加载文章列表...</td></tr>
+              <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">正在加载文章列表...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </section>
 
-    <!-- TAB 3: 部署到 GitHub -->
+    <!-- ========================================== -->
+    <!-- TAB 4: 🚀 部署到 GitHub -->
+    <!-- ========================================== -->
     <section id="tab-deploy" style="display: none;">
       <div class="card">
         <h2 class="card-title">🚀 一键提交并推送到 GitHub</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
-          点击下方按钮后，后台会自动执行 <code>git add .</code>、<code>git commit</code> 和 <code>git push origin main</code>，触发 GitHub Actions 自动构建部署。
+        <p class="card-desc">
+          点击下方按钮后，后台将自动执行 <code>git add .</code>、<code>git commit</code> 和 <code>git push origin main</code>，GitHub Actions 将在 1 分钟内自动部署上线。
         </p>
+
+        <div id="git-status-card" class="stat-card" style="margin-bottom: 20px;">
+          <div>
+            <div class="stat-label">当前本地 Git 状态</div>
+            <div id="git-status-summary" style="font-weight: 600; margin-top: 4px;">检测中...</div>
+          </div>
+          <button class="btn btn-sm" onclick="checkGitStatus()">🔄 检查变动</button>
+        </div>
 
         <div class="form-group">
           <label class="form-label">提交说明（Commit Message）</label>
-          <input type="text" id="git-msg" class="form-input" value="feat: 发布新文章并更新内容">
+          <input type="text" id="git-msg" class="form-input" value="feat: 更新博客文章与相册">
           <div class="chip-group">
             <span class="chip" onclick="setGitMsg('feat: 发布新博文')">feat: 发布新博文</span>
-            <span class="chip" onclick="setGitMsg('feat: 发布新日记')">feat: 发布新日记</span>
+            <span class="chip" onclick="setGitMsg('feat: 发布生活日记')">feat: 发布生活日记</span>
+            <span class="chip" onclick="setGitMsg('feat: 新增相册照片')">feat: 新增相册照片</span>
             <span class="chip" onclick="setGitMsg('fix: 修正排版与内容')">fix: 修正排版与内容</span>
             <span class="chip" onclick="setGitMsg('chore: 更新全站内容')">chore: 更新全站内容</span>
           </div>
@@ -457,6 +999,8 @@ HTML_PAGE = """<!DOCTYPE html>
 
   <script>
     let allArticles = [];
+    let allGallery = [];
+    let curGalleryCat = 'all';
 
     function toggleTheme() {
       document.body.classList.toggle('dark');
@@ -469,19 +1013,41 @@ HTML_PAGE = """<!DOCTYPE html>
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.getElementById('tab-publish').style.display = 'none';
+      document.getElementById('tab-gallery').style.display = 'none';
       document.getElementById('tab-manage').style.display = 'none';
       document.getElementById('tab-deploy').style.display = 'none';
 
       if (tabId === 'publish') {
         document.querySelectorAll('.tab-btn')[0].classList.add('active');
         document.getElementById('tab-publish').style.display = 'block';
-      } else if (tabId === 'manage') {
+      } else if (tabId === 'gallery') {
         document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('tab-gallery').style.display = 'block';
+        loadGallery();
+      } else if (tabId === 'manage') {
+        document.querySelectorAll('.tab-btn')[2].classList.add('active');
         document.getElementById('tab-manage').style.display = 'block';
         loadArticles();
       } else if (tabId === 'deploy') {
-        document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        document.querySelectorAll('.tab-btn')[3].classList.add('active');
         document.getElementById('tab-deploy').style.display = 'block';
+        checkGitStatus();
+      }
+    }
+
+    async function pickFile(type) {
+      try {
+        const res = await fetch('/api/pick-file?type=' + type);
+        const data = await res.json();
+        if (data.path) {
+          if (type === 'image') {
+            document.getElementById('gallery-file-path').value = data.path;
+          } else {
+            document.getElementById('file-path').value = data.path;
+          }
+        }
+      } catch (e) {
+        alert('文件选择器调用失败：' + e.message);
       }
     }
 
@@ -493,6 +1059,7 @@ HTML_PAGE = """<!DOCTYPE html>
     }
     function setGitMsg(msg) { document.getElementById('git-msg').value = msg; }
 
+    /* Hugo 状态 */
     async function checkHugoStatus() {
       try {
         const res = await fetch('/api/hugo-status');
@@ -508,7 +1075,7 @@ HTML_PAGE = """<!DOCTYPE html>
         } else {
           badge.className = 'status-badge stopped';
           text.textContent = 'Hugo 未运行';
-          toggleBtn.textContent = '▶️ 启动服务';
+          toggleBtn.textContent = '▶️ 启动 Hugo';
           toggleBtn.className = 'btn btn-sm';
         }
       } catch (e) {}
@@ -532,10 +1099,168 @@ HTML_PAGE = """<!DOCTYPE html>
       }
     }
 
+    /* 发布笔记 */
+    async function doPublish() {
+      const path = document.getElementById('file-path').value.trim();
+      if (!path) { alert('请先选择或输入笔记文件的完整路径！'); return; }
+
+      const btn = document.getElementById('publish-btn');
+      const log = document.getElementById('publish-log');
+      btn.disabled = true;
+      btn.textContent = '⏳ 正在解析并转换附件...';
+      log.style.display = 'block';
+      log.textContent = '正在读取文件并转换附件为 WebP 格式...\\n';
+
+      try {
+        const res = await fetch('/api/publish', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            path: path,
+            type: document.getElementById('pub-type').value,
+            slug: document.getElementById('pub-slug').value.trim(),
+            category: document.getElementById('pub-category').value.trim(),
+            tags: document.getElementById('pub-tags').value.trim(),
+            draft: document.getElementById('pub-draft').checked
+          })
+        });
+        const data = await res.json();
+        log.textContent = data.output || data.message;
+        if (data.success) {
+          log.textContent += '\\n✅ 处理成功！可前往「全站文章管理」或「部署到 GitHub」查看。';
+        } else {
+          log.textContent += '\\n❌ 处理失败：' + data.message;
+        }
+      } catch (e) {
+        log.textContent += '\\n❌ 出现异常：' + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 立即转换并发布';
+      }
+    }
+
+    /* 相册管理 */
+    async function loadGallery() {
+      try {
+        const res = await fetch('/api/gallery');
+        allGallery = await res.json();
+        document.getElementById('gallery-counter').textContent = allGallery.length;
+        document.getElementById('count-all').textContent = allGallery.length;
+        document.getElementById('count-anime').textContent = allGallery.filter(x => x.category === 'anime').length;
+        document.getElementById('count-photo').textContent = allGallery.filter(x => x.category === 'photography').length;
+        document.getElementById('count-daily').textContent = allGallery.filter(x => x.category === 'daily').length;
+        renderGallery();
+      } catch (e) {
+        document.getElementById('gallery-grid').innerHTML = '<div style="color:var(--accent);padding:20px;">加载相册失败：' + e.message + '</div>';
+      }
+    }
+
+    function filterGallery(cat, btn) {
+      curGalleryCat = cat;
+      document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderGallery();
+    }
+
+    function renderGallery() {
+      const container = document.getElementById('gallery-grid');
+      const list = curGalleryCat === 'all' ? allGallery : allGallery.filter(x => x.category === curGalleryCat);
+      if (!list || list.length === 0) {
+        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);">暂无此分类照片</div>';
+        return;
+      }
+      container.innerHTML = list.map(item => `
+        <div class="gallery-card">
+          <div class="gallery-card-img-wrap">
+            <img class="gallery-card-img" src="${item.image}" alt="${escapeHtml(item.caption)}" loading="lazy">
+            <span class="gallery-card-badge">#${item.number}</span>
+          </div>
+          <div class="gallery-card-body">
+            <div>
+              <div class="gallery-card-title" title="${escapeHtml(item.caption)}">${escapeHtml(item.caption) || '未命名作品'}</div>
+              <div class="gallery-card-meta">
+                <span>比例: ${item.ratio}</span>
+                <span>${item.category === 'anime' ? '🎨 动漫' : (item.category === 'photography' ? '📷 摄影' : '☕ 日常')}</span>
+              </div>
+            </div>
+            <div class="gallery-card-actions">
+              <a class="btn btn-sm" href="${item.image}" target="_blank">🔍 原图</a>
+              <button class="btn btn-sm btn-danger" onclick="confirmDeleteGallery('${item.image}', '${escapeHtml(item.caption)}')">🗑️ 移除</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function doAddGallery() {
+      const path = document.getElementById('gallery-file-path').value.trim();
+      if (!path) { alert('请先选择或输入图片文件路径！'); return; }
+
+      const btn = document.getElementById('add-gallery-btn');
+      const log = document.getElementById('gallery-log');
+      btn.disabled = true;
+      btn.textContent = '⏳ 正在测量宽高比并转换 WebP...';
+      log.style.display = 'block';
+      log.textContent = '正在读取图片并使用 macOS 底层引擎提取尺寸...\\n';
+
+      try {
+        const res = await fetch('/api/gallery/add', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            path: path,
+            category: document.getElementById('gallery-cat').value,
+            caption: document.getElementById('gallery-caption').value.trim(),
+            tags: document.getElementById('gallery-tags').value.trim()
+          })
+        });
+        const data = await res.json();
+        log.textContent = data.message;
+        if (data.success) {
+          log.textContent += '\\n✅ 已成功写入相册数据库！';
+          document.getElementById('gallery-file-path').value = '';
+          document.getElementById('gallery-caption').value = '';
+          loadGallery();
+        }
+      } catch (e) {
+        log.textContent += '\\n❌ 操作失败：' + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ 自动测量宽高、转码并加入相册';
+      }
+    }
+
+    async function confirmDeleteGallery(imgUrl, caption) {
+      if (!confirm(`确定要从相册中移除《${caption || imgUrl}》吗？关联的 webp 图片也将被清理。`)) return;
+      try {
+        const res = await fetch('/api/gallery/delete', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({image: imgUrl})
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadGallery();
+        } else {
+          alert('移除失败：' + data.message);
+        }
+      } catch (e) { alert('请求异常：' + e.message); }
+    }
+
+    /* 文章列表管理 */
     async function loadArticles() {
       try {
         const res = await fetch('/api/articles');
         allArticles = await res.json();
+        document.getElementById('articles-counter').textContent = allArticles.length;
+        
+        const posts = allArticles.filter(x => x.type === 'post').length;
+        const diaries = allArticles.filter(x => x.type === 'diary').length;
+        const drafts = allArticles.filter(x => x.draft).length;
+        document.getElementById('stat-posts').textContent = posts;
+        document.getElementById('stat-diaries').textContent = diaries;
+        document.getElementById('stat-drafts').textContent = drafts;
+
         renderArticles(allArticles);
       } catch (e) {
         document.getElementById('articles-tbody').innerHTML = '<tr><td colspan="6" style="color:var(--accent);">加载失败：' + e.message + '</td></tr>';
@@ -559,7 +1284,7 @@ HTML_PAGE = """<!DOCTYPE html>
           <td><code style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(item.slug)}</code></td>
           <td>
             <div style="display:flex;gap:6px;">
-              <a class="btn btn-sm" href="http://localhost:1314${item.url}" target="_blank" title="在新标签页预览">👁️ 查看</a>
+              <a class="btn btn-sm" href="http://localhost:1314${item.url}" target="_blank" title="在新标签页预览">👁️ 预览</a>
               <button class="btn btn-sm" onclick="toggleDraft('${item.slug}', ${!item.draft})">${item.draft ? '🟢 上架' : '🟡 下架'}</button>
               <button class="btn btn-sm btn-danger" onclick="confirmDelete('${item.slug}', '${escapeHtml(item.title)}')">🗑️ 删除</button>
             </div>
@@ -608,43 +1333,18 @@ HTML_PAGE = """<!DOCTYPE html>
       } catch (e) { alert('请求异常：' + e.message); }
     }
 
-    async function doPublish() {
-      const path = document.getElementById('file-path').value.trim();
-      if (!path) { alert('请输入或粘贴笔记文件的完整路径！'); return; }
-
-      const btn = document.getElementById('publish-btn');
-      const log = document.getElementById('publish-log');
-      btn.disabled = true;
-      btn.textContent = '⏳ 正在转换并提取附件...';
-      log.style.display = 'block';
-      log.textContent = '正在读取文件并转换附件为 WebP 格式...\\n';
-
+    /* Git 部署 */
+    async function checkGitStatus() {
       try {
-        const res = await fetch('/api/publish', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            path: path,
-            type: document.getElementById('pub-type').value,
-            slug: document.getElementById('pub-slug').value.trim(),
-            category: document.getElementById('pub-category').value.trim(),
-            tags: document.getElementById('pub-tags').value.trim(),
-            draft: document.getElementById('pub-draft').checked
-          })
-        });
+        const res = await fetch('/api/git-status');
         const data = await res.json();
-        log.textContent = data.output || data.message;
-        if (data.success) {
-          log.textContent += '\\n✅ 处理完成！可前往「全站文章管理」或「部署到 GitHub」查看。';
+        const summary = document.getElementById('git-status-summary');
+        if (data.clean) {
+          summary.innerHTML = '<span style="color:var(--success);">🟢 工作区干净，所有文件已是最新 (分支: ' + data.branch + ')</span>';
         } else {
-          log.textContent += '\\n❌ 处理失败：' + data.message;
+          summary.innerHTML = '<span style="color:var(--warning);">🟡 检测到 ' + data.changed_count + ' 个文件待提交推送 (分支: ' + data.branch + ')</span>';
         }
-      } catch (e) {
-        log.textContent += '\\n❌ 出现异常：' + e.message;
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '🚀 立即转换并发布';
-      }
+      } catch (e) {}
     }
 
     async function doDeploy() {
@@ -667,6 +1367,7 @@ HTML_PAGE = """<!DOCTYPE html>
         log.textContent = data.output;
         if (data.success) {
           log.textContent += '\\n🎉 推送成功！GitHub Actions 已触发自动构建，约 1 分钟后线上即可访问。';
+          checkGitStatus();
         } else {
           log.textContent += '\\n❌ 推送遇到问题，请检查网络或输出日志。';
         }
@@ -689,7 +1390,17 @@ HTML_PAGE = """<!DOCTYPE html>
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        pass  # 静默请求日志，保持终端清爽
+        pass  # 保持终端整洁
+
+    def serve_file(self, filepath: Path):
+        mime = MIME_TYPES.get(filepath.suffix.lower(), 'application/octet-stream')
+        self.send_response(200)
+        self.send_header('Content-Type', mime)
+        self.send_header('Content-Length', str(filepath.stat().st_size))
+        self.send_header('Cache-Control', 'max-age=3600')
+        self.end_headers()
+        with open(filepath, 'rb') as f:
+            shutil.copyfileobj(f, self.wfile)
 
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
@@ -698,15 +1409,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.end_headers()
             self.wfile.write(HTML_PAGE.encode('utf-8'))
+        elif url.path.startswith('/images/'):
+            local_path = (BLOG_ROOT / 'static' / url.path.lstrip('/')).resolve()
+            if local_path.exists() and local_path.is_file():
+                self.serve_file(local_path)
+            else:
+                self.send_error(404, "Image Not Found")
+        elif url.path.startswith('/posts/') or url.path.startswith('/diary/'):
+            local_path = (BLOG_ROOT / 'content' / url.path.lstrip('/')).resolve()
+            if local_path.exists() and local_path.is_file():
+                self.serve_file(local_path)
+            else:
+                self.send_error(404, "File Not Found")
         elif url.path == '/api/articles':
             articles = get_all_articles()
             self.send_json(articles)
+        elif url.path == '/api/gallery':
+            items = get_gallery_images()
+            self.send_json(items)
         elif url.path == '/api/hugo-status':
             running = is_port_in_use(1314)
             self.send_json({'running': running})
         elif url.path == '/api/git-status':
             status = get_git_status()
             self.send_json(status)
+        elif url.path == '/api/pick-file':
+            query = urllib.parse.parse_qs(url.query)
+            ftype = query.get('type', ['note'])[0]
+            if ftype == 'image':
+                selected = pick_file_macos("选择相册图片文件", '{"png", "jpg", "jpeg", "webp", "gif"}')
+            else:
+                selected = pick_file_macos("选择笔记或Notebook文件", '{"md", "ipynb", "markdown"}')
+            self.send_json({'path': selected})
         else:
             self.send_error(404, "Not Found")
 
@@ -737,7 +1471,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
             tags = [t.strip() for t in tags_raw.split(',') if t.strip()]
             draft = bool(payload.get('draft', False))
 
-            # 捕获函数标准输出
             import io
             from contextlib import redirect_stdout, redirect_stderr
             log_buffer = io.StringIO()
@@ -751,12 +1484,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
             output_text = log_buffer.getvalue()
             self.send_json({'success': ok, 'message': '发布完成' if ok else '发布失败', 'output': output_text})
 
-        elif url.path == '/api/set-draft':
-            slug = payload.get('slug', '').strip()
-            make_draft = bool(payload.get('draft', True))
-            ok = set_draft_status(slug, set_draft=make_draft)
-            self.send_json({'success': ok, 'message': f'已{"下架" if make_draft else "上架"}' if ok else '未找到该文章'})
-
         elif url.path == '/api/toggle-hugo':
             running = is_port_in_use(1314)
             if running:
@@ -764,6 +1491,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
             else:
                 ok, msg = start_hugo_server()
             self.send_json({'success': ok, 'message': msg, 'running': is_port_in_use(1314)})
+
+        elif url.path == '/api/gallery/add':
+            fpath = payload.get('path', '').strip()
+            cat = payload.get('category', 'anime').strip()
+            caption = payload.get('caption', '').strip()
+            tags_raw = payload.get('tags', '').strip()
+            tags = [t.strip() for t in tags_raw.split(',') if t.strip()]
+            ok, msg = add_gallery_image(fpath, cat, caption, tags)
+            self.send_json({'success': ok, 'message': msg})
+
+        elif url.path == '/api/gallery/delete':
+            img_url = payload.get('image', '').strip()
+            ok, msg = delete_gallery_image(img_url)
+            self.send_json({'success': ok, 'message': msg})
+
+        elif url.path == '/api/set-draft':
+            slug = payload.get('slug', '').strip()
+            make_draft = bool(payload.get('draft', True))
+            ok = set_draft_status(slug, set_draft=make_draft)
+            self.send_json({'success': ok, 'message': f'已{"下架" if make_draft else "上架"}' if ok else '未找到该文章'})
 
         elif url.path == '/api/delete':
             slug = payload.get('slug', '').strip()
@@ -804,9 +1551,9 @@ def run_server():
     server = HTTPServer(('127.0.0.1', port), DashboardHandler)
     url = f"http://localhost:{port}"
     print(f"\n=======================================================")
-    print(f"✨ find-xin 博客可视化控制台已启动！")
+    print(f"✨ 有珠之夜 · 博客桌面可视化控制台 2.0 已启动！")
     print(f"🌐 访问地址：{url}")
-    print(f"💡 浏览器将自动打开。按 Ctrl + C 可关闭控制台。")
+    print(f"💡 浏览器已自动打开。按 Ctrl + C 可关闭控制台。")
     print(f"=======================================================\n")
     try:
         webbrowser.open(url)
