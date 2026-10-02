@@ -42,7 +42,7 @@ enableRobotsTXT = true
   minifyOutput = true
 
 [markup.goldmark.renderer]
-  unsafe = false
+  unsafe = true
   hardWraps = true
 
 [markup.tableOfContents]

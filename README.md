@@ -16,6 +16,7 @@
   - [2.4 上传与嵌入 PDF 文档](#24-上传与嵌入-pdf-文档)
   - [2.5 管理多分区相册（摄影 / 日常 / 动漫）](#25-管理多分区相册摄影--日常--动漫)
   - [2.6 从 Obsidian 发布文章与日记（带 attachments 附件）](#26-从-obsidian-发布文章与日记带-attachments-附件)
+  - [2.7 发布 Jupyter Notebook（.ipynb 文件）](#27-发布-jupyter-notebookipynb-文件)
 - [3. 本地调试与上传 GitHub 操作流程（必读命令）](#3-本地调试与上传-github-操作流程必读命令)
 - [4. 常见问题与避坑提示](#4-常见问题与避坑提示)
 
@@ -307,6 +308,34 @@ python3 scripts/publish_obsidian.py --delete "久远寺有珠"
 3. **补充 Front Matter**：
    - 在 `index.md` 顶部加上两行 `---`，配置 `title`、`date`、`draft: false` 等参数。
    - 封面可直接填写：`cover: 'attachments/your-cover.png'`。
+
+---
+
+### 2.7 发布 Jupyter Notebook（.ipynb 文件）
+
+博客现已**原生完整支持 Jupyter Notebook（`.ipynb`）文件的一键解析与发布**，无需在本地安装 `jupyter`、`nbconvert` 或任何复杂外部依赖！
+
+#### 使用方法：
+
+##### 1. 一键发布 Notebook
+```bash
+# 直接指定 .ipynb 路径即可发布为博客文章
+python3 scripts/publish_obsidian.py "/Users/xin/Documents/Lab/数据分析实战.ipynb"
+
+# 自定义文件夹别名、分类与标签
+python3 scripts/publish_obsidian.py "/path/to/deep_learning.ipynb" \
+  --slug deep-learning-lab \
+  --category "机器学习" \
+  --tags "PyTorch,深度学习,Python"
+```
+
+##### 2. 转换特性一览：
+- 🐍 **代码单元格高亮**：所有 Python 代码单元格均自动转换为语法高亮的代码块，支持一键复制代码。
+- 📊 **图表自动提取与转 WebP**：Matplotlib、Seaborn、Plotly 等绘制的图表（Base64 图片）会自动提取并**通过 `cwebp` 转换为高清 `.webp` 格式**保存在文章的 `attachments/` 目录中。
+- 🎨 **自动设置封面**：Notebook 中生成的第一张数据可视化图表会自动提取作为博客首页的杂志封面卡片。
+- 🧮 **LaTeX 数学公式**：Markdown 单元格中使用的公式（如 `$\text{MSE} = ...$`）会自动被 KaTeX 渲染。
+- 📋 **Pandas DataFrame 表格渲染**：表格与数据框输出自适应横向滚动，带有优雅的斑马纹交替底色。
+- 💻 **控制台输出与报错**：`print(...)` 的标准输出和错误 Traceback 均会自动包装在优雅的终端输出框内展示。
 
 ---
 

@@ -452,13 +452,174 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
     print("   git push origin main\n")
     return True
 
+def process_ipynb_notebook(ipynb_path: Path, note_type: str, custom_slug: str | None, tags: list[str], category: str | None, draft: bool):
+    import json
+    import base64
+
+    if not ipynb_path.exists():
+        print(f"❌ 错误：找不到文件 {ipynb_path}")
+        return False
+
+    with open(ipynb_path, 'r', encoding='utf-8') as f:
+        try:
+            nb_data = json.load(f)
+        except Exception as e:
+            print(f"❌ 解析 .ipynb JSON 失败：{e}")
+            return False
+
+    base_name = ipynb_path.stem
+    slug = custom_slug or sanitize_slug(base_name)
+
+    if note_type == 'diary':
+        target_dir = BLOG_ROOT / 'content' / 'diary' / slug
+    else:
+        target_dir = BLOG_ROOT / 'content' / 'posts' / slug
+
+    target_attachments_dir = target_dir / 'attachments'
+    target_attachments_dir.mkdir(parents=True, exist_ok=True)
+
+    cells = nb_data.get("cells", [])
+    body_parts = []
+    first_title = None
+    first_image_path = None
+    has_math = False
+    img_counter = 0
+
+    for i, cell in enumerate(cells):
+        ctype = cell.get("cell_type")
+        source = "".join(cell.get("source", []))
+        
+        if ctype == "markdown":
+            if "$" in source:
+                has_math = True
+            if not first_title:
+                h1_match = re.search(r"^#\s+(.+)$", source, flags=re.MULTILINE)
+                if h1_match:
+                    first_title = h1_match.group(1).strip()
+                    source = re.sub(r"^#\s+.+\n?", "", source, count=1, flags=re.MULTILINE)
+            
+            # 处理单元格内部嵌入的附件 (attachment:name)
+            if "attachments" in cell:
+                for att_name, att_data in cell["attachments"].items():
+                    for mime, b64 in att_data.items():
+                        raw_bytes = base64.b64decode(b64)
+                        safe_att = sanitize_filename(att_name)
+                        tmp_path = target_attachments_dir / safe_att
+                        tmp_path.write_bytes(raw_bytes)
+                        final_att = convert_to_webp_if_possible(tmp_path, target_attachments_dir, safe_att)
+                        source = source.replace(f"attachment:{att_name}", f"attachments/{final_att}")
+            
+            body_parts.append(source.strip())
+
+        elif ctype == "code":
+            if not source.strip():
+                continue
+            body_parts.append(f"```python\n{source.strip()}\n```")
+            
+            outputs = cell.get("outputs", [])
+            for out in outputs:
+                otype = out.get("output_type")
+                if otype == "stream":
+                    text = "".join(out.get("text", [])).strip()
+                    if text:
+                        body_parts.append(f"<div class=\"notebook-output-block\">\n{text}\n</div>")
+                elif otype in ("display_data", "execute_result"):
+                    data = out.get("data", {})
+                    # 图表输出（Matplotlib / Seaborn / Plotly）
+                    if "image/png" in data or "image/jpeg" in data:
+                        img_counter += 1
+                        mime = "image/png" if "image/png" in data else "image/jpeg"
+                        ext = ".png" if mime == "image/png" else ".jpg"
+                        b64_data = data[mime]
+                        raw_bytes = base64.b64decode(b64_data)
+                        
+                        out_name = f"plot-cell-{i+1}-{img_counter}{ext}"
+                        out_path = target_attachments_dir / out_name
+                        out_path.write_bytes(raw_bytes)
+                        
+                        final_name = convert_to_webp_if_possible(out_path, target_attachments_dir, out_name)
+                        rel_img = f"attachments/{final_name}"
+                        if not first_image_path:
+                            first_image_path = rel_img
+                        body_parts.append(f"![图表输出]({rel_img})")
+                    elif "text/html" in data:
+                        html_table = "".join(data["text/html"]).strip()
+                        body_parts.append(f"<div class=\"notebook-table\">\n{html_table}\n</div>")
+                    elif "text/plain" in data:
+                        text = "".join(data["text/plain"]).strip()
+                        if text and not text.startswith("<Figure"):
+                            body_parts.append(f"<div class=\"notebook-output-block\">\n{text}\n</div>")
+                elif otype == "error":
+                    tb = "\n".join(out.get("traceback", []))
+                    clean_tb = re.sub(r"\x1b\[[0-9;]*m", "", tb).strip()
+                    if clean_tb:
+                        body_parts.append(f"<div class=\"notebook-output-block\" style=\"border-left-color: #ff4757;\">\n{clean_tb}\n</div>")
+
+    title = first_title or base_name
+    mtime = datetime.fromtimestamp(ipynb_path.stat().st_mtime)
+    date_str = mtime.strftime('%Y-%m-%dT%H:%M:%S+08:00')
+
+    new_body = "\n\n".join(body_parts)
+
+    out_fm = ["---"]
+    out_fm.append(f"title: '{title}'")
+    out_fm.append(f"date: {date_str}")
+    out_fm.append(f"draft: {'true' if draft else 'false'}")
+    
+    clean_text = re.sub(r'!\[.*?\]\(.*?\)', '', new_body)
+    clean_text = re.sub(r'<[^>]+>', '', clean_text)
+    clean_text = re.sub(r'[#*`$\\]', '', clean_text)
+    summary = ""
+    for line in clean_text.splitlines():
+        line = line.strip()
+        if line and len(line) >= 4 and not line.startswith("import") and not line.startswith("from"):
+            summary = line[:80].replace("'", "")
+            break
+    if summary:
+        out_fm.append(f"summary: '{summary}'")
+
+    if first_image_path:
+        out_fm.append(f"cover: '{first_image_path}'")
+        out_fm.append("hideCover: true")
+
+    out_fm.append("pinned: false")
+    if has_math or '$' in new_body:
+        out_fm.append("math: true")
+
+    cur_cat = category or '数据科学'
+    out_fm.append(f"categories: {['Jupyter', cur_cat]}")
+
+    cur_tags = tags or ['Jupyter', 'Python', '数据分析']
+    out_fm.append(f"tags: {cur_tags}")
+    out_fm.append("---\n")
+
+    target_md = target_dir / 'index.md'
+    with open(target_md, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(out_fm))
+        f.write('\n' + new_body.lstrip('\n'))
+
+    print(f"\n🎉 成功将 Jupyter Notebook (.ipynb) 发布为 Hugo 页面！")
+    print(f"📁 目标目录：{target_dir.relative_to(BLOG_ROOT)}")
+    print(f"📄 文章入口：{target_md.relative_to(BLOG_ROOT)}")
+    print(f"🖼️ 提取图表：{img_counter} 个并自动转为 WebP")
+    if first_image_path:
+        print(f"🎨 自动封面：{first_image_path}")
+
+    print("\n👉 下一步操作建议：")
+    print("1. 本地启动预览：hugo server -D --port 1314 --bind 127.0.0.1 --disableFastRender")
+    print("2. 提交并推送到 GitHub：")
+    print(f"   git add {target_dir.relative_to(BLOG_ROOT)}")
+    print(f"   git commit -m \"feat: 发布 Notebook《{title}》\"")
+    print("   git push origin main\n")
+    return True
+
 def main():
-    parser = argparse.ArgumentParser(description="一键管理与发布 Obsidian 笔记与 attachments 附件到 Hugo 博客")
-    parser.add_argument("file", nargs="?", help="Obsidian 笔记的绝对路径或相对路径（.md 文件）")
+    parser = argparse.ArgumentParser(description="一键管理与发布 Markdown (.md) 与 Jupyter Notebook (.ipynb) 到 Hugo 博客")
+    parser.add_argument("file", nargs="?", help="笔记文件路径（支持 .md 或 .ipynb）")
     parser.add_argument("--type", choices=['post', 'diary'], default='post', help="发布类型：post（博文长文）或 diary（微光日记，默认 post）")
     parser.add_argument("--slug", help="指定的英文文件夹别名（若不指定则自动根据标题生成）")
-    parser.add_argument("--category", help="博文分类，例如 '技术'、'思考'")
-    parser.add_argument("--tags", help="标签列表（逗号分隔），例如 'Obsidian,Hugo,笔记'")
+    parser.add_argument("--category", help="博文分类，例如 '技术'、'机器学习'")
+    parser.add_argument("--tags", help="标签列表（逗号分隔），例如 'Python,Jupyter,数据分析'")
     parser.add_argument("--draft", action="store_true", help="是否保存为草稿（默认直接发布 draft: false）")
     parser.add_argument("--list", action="store_true", help="列出全站所有文章/日记及其发布状态")
     parser.add_argument("--unpublish", help="下架指定文章（设为草稿 draft: true），支持按标题或 slug 匹配")
@@ -487,15 +648,27 @@ def main():
         parser.print_help()
         return
 
+    file_path = Path(args.file).resolve()
     tags_list = [t.strip() for t in args.tags.split(',')] if args.tags else []
-    process_obsidian_note(
-        md_path=Path(args.file).resolve(),
-        note_type=args.type,
-        custom_slug=args.slug,
-        tags=tags_list,
-        category=args.category,
-        draft=args.draft
-    )
+
+    if file_path.suffix.lower() == '.ipynb':
+        process_ipynb_notebook(
+            ipynb_path=file_path,
+            note_type=args.type,
+            custom_slug=args.slug,
+            tags=tags_list,
+            category=args.category,
+            draft=args.draft
+        )
+    else:
+        process_obsidian_note(
+            md_path=file_path,
+            note_type=args.type,
+            custom_slug=args.slug,
+            tags=tags_list,
+            category=args.category,
+            draft=args.draft
+        )
 
 if __name__ == '__main__':
     main()

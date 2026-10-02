@@ -3316,6 +3316,46 @@ body.dark-mode .giscus-setup-btn:hover {
   color: #ffffff;
 }
 
+/* ===== Jupyter Notebook .ipynb Integration ===== */
+.notebook-table {
+  overflow-x: auto;
+  margin: 1.6em 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--card-background-color);
+}
+.notebook-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.notebook-table th, .notebook-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+}
+.notebook-table tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
+body.dark-mode .notebook-table tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
+.notebook-output-block {
+  margin-top: -1em;
+  margin-bottom: 1.6em;
+  background: rgba(0, 0, 0, 0.025);
+  border-left: 3px solid var(--accent-color);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 16px;
+  font-family: var(--font-code, monospace);
+  font-size: 0.88rem;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+body.dark-mode .notebook-output-block {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
