@@ -1,6 +1,11 @@
 # find-xin 的个人博客 (Hugo Magazine & Dark Night Theme)
 
-本项目是基于 **Hugo Extended** 构建的高性能个人静态博客，融合了优雅的杂志排版（Magazine Style）、日夜间双重模式平滑切换、全屏沉浸式光影相册、微光生活日记、知识资料库、Giscus 社区留言板及客户端实时全文检索。
+[![Release v1.0.0](https://img.shields.io/badge/Release-v1.0.0-crimson.svg?style=flat-square)](https://github.com/find-xin/find-xin.github.io/releases/tag/v1.0.0)
+[![Hugo Extended](https://img.shields.io/badge/Hugo-Extended_v0.166.0+-blue.svg?style=flat-square)](https://gohugo.io/)
+[![Python 3](https://img.shields.io/badge/Python-3_Native_Zero_Pip-green.svg?style=flat-square)](https://python.org/)
+[![License](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-orange.svg?style=flat-square)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
+本项目是基于 **Hugo Extended (v0.166.0+)** 构建的高性能个人静态博客（杂志风 + 型月夜间美学）。融合了优雅的杂志排版（Magazine Style）、日夜间双重模式平滑切换、全屏沉浸式光影相册、生活微光手记、知识资料库、Giscus 社区留言板及客户端实时全文检索。
 
 博客通过 **GitHub Actions** 自动化持续集成（CI/CD），一旦将修改推送到 `main` 分支，即会自动编译并部署到 **[find-xin.github.io](https://find-xin.github.io/)**。
 
@@ -13,17 +18,24 @@
   - [0.2 如何启动控制台与服务？（三种便捷方式）](#02-如何启动控制台与服务三种便捷方式)
   - [0.3 控制台六大核心功能模块一览](#03-控制台六大核心功能模块一览)
 - [1. 网站核心目录架构](#1-网站核心目录架构)
-- [2. 发布内容指南](#2-发布内容指南)
-  - [2.1 撰写长篇博文（Markdown 文章）](#21-撰写长篇博文markdown-文章)
-  - [2.2 记录随想与微光日记（Diary）](#22-记录随想与微光日记diary)
-  - [2.3 插入图片与撰写「带图 Markdown」](#23-插入图片与撰写带图-markdown)
-  - [2.4 PDF 文档处理（博文展示型 vs 资料库型）](#24-pdf-文档处理博文展示型-vs-资料库型)
-  - [2.5 管理多分区相册（摄影 / 日常 / 动漫 · 含拍摄日期）](#25-管理多分区相册摄影--日常--动漫--含拍摄日期)
-  - [2.6 从 Obsidian 发布笔记（带 attachments 附件与 WebP 转码）](#26-从-obsidian-发布笔记带-attachments-附件与-webp-转码)
-  - [2.7 发布 Jupyter Notebook（.ipynb 原生解析）](#27-发布-jupyter-notebookipynb-原生解析)
-- [3. 全站归档与分类体系](#3-全站归档与分类体系)
-- [4. 本地调试与上传 GitHub 操作流程（必读命令）](#4-本地调试与上传-github-操作流程必读命令)
-- [5. 常见问题与避坑提示（含 Slug 命名规范）](#5-常见问题与避坑提示含-slug-命名规范)
+- [2. 🎨 杂志风美学与前端排版设计规范](#2--杂志风美学与前端排版设计规范)
+  - [2.1 气泡悬浮顶栏（Navbar Bubble）](#21-气泡悬浮顶栏navbar-bubble)
+  - [2.2 首页 48px 标准垂直留白律动](#22-首页-48px-标准垂直留白律动)
+  - [2.3 首篇头条卡片无缝直角接壤（Seamless Lead Card）](#23-首篇头条卡片无缝直角接壤seamless-lead-card)
+  - [2.4 单行通栏极简杂志页脚（Single-Row Minimalist Footer）](#24-单行通栏极简杂志页脚single-row-minimalist-footer)
+  - [2.5 统一时间字体绝对红线（Non-Serif Standard）](#25-统一时间字体绝对红线non-serif-standard)
+  - [2.6 归档纯文本分类与全站标签风格](#26-归档纯文本分类与全站标签风格)
+- [3. 发布内容指南](#3-发布内容指南)
+  - [3.1 撰写长篇博文（Markdown 文章）](#31-撰写长篇博文markdown-文章)
+  - [3.2 记录随想与微光日记（Diary）](#32-记录随想与微光日记diary)
+  - [3.3 插入图片与撰写「带图 Markdown」](#33-插入图片与撰写带图-markdown)
+  - [3.4 PDF 文档处理（博文展示型 vs 资料库型）](#34-pdf-文档处理博文展示型-vs-资料库型)
+  - [3.5 管理多分区相册（摄影 / 日常 / 动漫 · 含拍摄日期）](#35-管理多分区相册摄影--日常--动漫--含拍摄日期)
+  - [3.6 从 Obsidian 发布笔记（带 attachments 附件与 WebP 转码）](#36-从-obsidian-发布笔记带-attachments-附件与-webp-转码)
+  - [3.7 发布 Jupyter Notebook（.ipynb 原生解析）](#37-发布-jupyter-notebookipynb-原生解析)
+- [4. 全站导航、专页与归档体系](#4-全站导航专页与归档体系)
+- [5. 本地调试、版本发布与上传 GitHub 操作流程（必读命令）](#5-本地调试版本发布与上传-github-操作流程必读命令)
+- [6. 常见问题与避坑提示（含 Slug 命名规范）](#6-常见问题与避坑提示含-slug-命名规范)
 
 ---
 
@@ -133,9 +145,9 @@ youshu-night/
 │   ├── _default/                # 默认文章与列表模板（含底栏爱心与淡雅更新时间）
 │   ├── diary/                   # 日记列表与单页模板
 │   ├── gallery/                 # 相册展示模板
-│   └── partials/                # 公共模块（导航、灯箱 Lightbox、留言板等）
+│   └── partials/                # 公共模块（气泡导航、极简页脚、灯箱 Lightbox、留言板等）
 ├── assets/                      # 前端样式与脚本（CSS / JS）
-│   ├── css/                     # 杂志风格样式 (magzine-hugo.css, diary.css 等)
+│   ├── css/                     # 杂志风格样式 (magzine-original.css, magzine-hugo.css, diary.css)
 │   └── js/                      # 相册交互 (gallery.js)、主题切换、搜索等
 ├── scripts/                     # 本地自动化与控制台脚本
 │   ├── dashboard.py             # 博客桌面管理控制台后端
@@ -148,9 +160,60 @@ youshu-night/
 
 ---
 
-## 2. 发布内容指南
+## 2. 🎨 杂志风美学与前端排版设计规范
 
-### 2.1 撰写长篇博文（Markdown 文章）
+为了保证整座博客始终呈现出如同高级纸质杂志般的纯净美学与型月夜间沉浸质感，全站严格恪守以下前端工程红线：
+
+### 2.1 气泡悬浮顶栏（Navbar Bubble）
+- **悬浮胶囊形态**：顶栏采用 `.header.navbar-bubble` 结构，浮动于页面上方，带有平滑的大圆角与微投影。
+- **毛玻璃高斯模糊**：背景融合 `backdrop-filter: blur(16px)`，在深浅色模式下分别自适应半透明质感，滚动时文字自然沉入其下。
+- **纯粹文字 Logo**：剔除任何不必要的星星字符与脉冲干扰，保留纯净的博主名称与微动效。
+- **快捷交互**：内置全局 `⌘K` 键盘直达极速搜索，支持昼夜模式无感知瞬间切换。
+
+### 2.2 首页 48px 标准垂直留白律动
+- **严谨的数学律动**：从 **名片英雄卡 ➜ 最新文章 ➜ 生活微光 ➜ 光影切片 ➜ 页脚**，所有主要大板块之间的上下呼吸间距统一锁定为 **48px**（移动端平滑自适应为 **36px**）。
+- **告别断层留白**：杜绝局部元素（如文章栅格与手记标题之间）累加多余的内边距，全站视觉流淌如丝般顺滑。
+
+### 2.3 首篇头条卡片无缝直角接壤（Seamless Lead Card）
+- **卡片外围自然圆角**：卡片容器采用 `border-radius: var(--radius-lg)` 与 `overflow: hidden`，四个外侧顶点平滑过渡。
+- **内部图片无缝直角**：首篇大图位于左侧半区，与右侧文字正文接壤处声明 `border-radius: 0 !important`，彻底杜绝图片右上角内凸产生的圆弧缝隙伪影。
+
+### 2.4 单行通栏极简杂志页脚（Single-Row Minimalist Footer）
+- **极度克制收窄**：摒弃多列表头与冗长金句，高度从 ~250px 大幅压缩至 **~50px**，留白充足无压迫感。
+- **结构一目了然**：
+  - **左侧**：站点标题与极简版权信息（`© 2026 find-xin · 基于 Hugo 构建`）。
+  - **右侧**：平铺排列核心纯文本链接（文章 ｜ 日记 ｜ 归档 ｜ 相册 ｜ 资料库 ｜ 友链 ｜ 留言 ｜ GitHub ｜ RSS）。
+- **零杂质设计**：严格杜绝闪烁星星、双徽标与重复的回到顶部链接。
+
+### 2.5 统一时间字体绝对红线（Non-Serif Standard）
+全站所有日期与时间元素（文章发布/更新时间、日记卡片时间、相册拍摄日期、归档时间轴日期、搜索结果日期、资料库日期等），**全部统一使用系统标准无衬线字体**：
+```css
+time,
+.post-date,
+.article-date,
+.archive-date,
+.diary-card-date,
+.home-diary-meta time,
+.album-card-date,
+.spotlight-item-date,
+.res-date,
+.footer-copyright {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+```
+> ⚠️ **严禁**在任何日期或版权元素上滥用等宽代码字体（`monospace`）或衬线字体。
+
+### 2.6 归档纯文本分类与全站标签风格
+- **归档纯文本分类**：文章分类与日记分类链接均采用纯文本样式（深色/浅色自适应），去除背景胶囊与刺眼标红。
+- **全站标签风格**：日记卡片与文章卡片标签统一为轻盈优雅的 `#标签名` 纯文本超链，交互更自然。
+
+---
+
+## 3. 发布内容指南
+
+### 3.1 撰写长篇博文（Markdown 文章）
 
 博文存放在 `content/posts/` 目录下。
 
@@ -184,7 +247,7 @@ slug: 'building-elegant-static-blog'  # URL 路径标识（建议全小写英文
 
 ---
 
-### 2.2 记录随想与微光日记（Diary）
+### 3.2 记录随想与微光日记（Diary）
 
 日记存放在 `content/diary/` 目录下，适合短篇生活记录、碎片随感。
 
@@ -193,7 +256,7 @@ slug: 'building-elegant-static-blog'  # URL 路径标识（建议全小写英文
 title: '秋日傍晚的滨江漫步'
 date: 2026-10-02T19:30:00+08:00
 draft: false
-category: '日常生活'                  # 日记专属分类
+diary_categories: ['日常生活']        # 日记专属分类
 mood: '惬意'                          # 心情标签（可选，如：惬意 / 晴朗 / 沉思）
 location: '徐汇滨江'                  # 地理位置（可选）
 cover: '/images/daily/autumn-walk.webp'
@@ -204,11 +267,11 @@ likes: 6                             # 初始点赞数
 正文记录今天的心情与生活切片……
 ```
 
-日记会自动汇总至首页下方的「生活微光」时间轴、日记归档列表页及全站搜索中。
+日记会自动汇总至首页下方的「生活微光」卡片、日记专页（`/diary/`）、日记归档（`/diary-archive/`）及全站搜索中。
 
 ---
 
-### 2.3 插入图片与撰写「带图 Markdown」
+### 3.3 插入图片与撰写「带图 Markdown」
 
 #### 1. 规范与存放位置
 - **推荐格式**：首选 **`.webp`**（体积小、加载迅速、画质无损），也支持 `.png`、`.jpg` 等。
@@ -228,7 +291,7 @@ likes: 6                             # 初始点赞数
 
 ---
 
-### 2.4 PDF 文档处理（博文展示型 vs 资料库型）
+### 3.4 PDF 文档处理（博文展示型 vs 资料库型）
 
 根据使用场景，博客对 PDF 提供了两种清晰的展示方案：
 
@@ -238,7 +301,7 @@ likes: 6                             # 初始点赞数
 - **在博文正文中内嵌预览**：
   ```html
   <div style="margin: 2rem 0; width: 100%;">
-    <iframe src="/docs/my-report.pdf" width="100%" height="680px" style="border: 1px solid var(--color-border); border-radius: 8px; background: #fff;">
+    <iframe src="/docs/my-report.pdf" width="100%" height="680px" style="border: 1px solid var(--border-color); border-radius: 8px; background: #fff;">
       <p>您的浏览器暂不支持内嵌预览，请 <a href="/docs/my-report.pdf">点击此处下载 PDF</a> 查看。</p>
     </iframe>
   </div>
@@ -255,7 +318,7 @@ likes: 6                             # 初始点赞数
 
 ---
 
-### 2.5 管理多分区相册（摄影 / 日常 / 动漫 · 含拍摄日期）
+### 3.5 管理多分区相册（摄影 / 日常 / 动漫 · 含拍摄日期）
 
 全站相册页面（`/gallery/`）与首页「光影切片」共享数据源 `data/gallery.yaml`：
 - **首页光影切片**：点击任意照片**直接在当前页面原地唤起全屏大图灯箱（Lightbox）**，支持键盘左右键切图与 Esc 退出，无需跳转页面。
@@ -277,7 +340,7 @@ likes: 6                             # 初始点赞数
 
 ---
 
-### 2.6 从 Obsidian 发布笔记（带 attachments 附件与 WebP 转码）
+### 3.6 从 Obsidian 发布笔记（带 attachments 附件与 WebP 转码）
 
 Obsidian 习惯使用 `attachments/` 文件夹管理图片，博客通过 **Page Bundle** 架构完美无缝兼容：
 
@@ -304,7 +367,7 @@ python3 scripts/publish_obsidian.py "/path/to/note.md" \
 
 ---
 
-### 2.7 发布 Jupyter Notebook（.ipynb 原生解析）
+### 3.7 发布 Jupyter Notebook（.ipynb 原生解析）
 
 无需安装任何第三方大型依赖，直接原生支持将 Jupyter Notebook 发布为博客文章：
 
@@ -322,23 +385,28 @@ python3 scripts/publish_obsidian.py "/path/to/data_analysis.ipynb" \
 
 ---
 
-## 3. 全站导航、专页与归档体系
+## 4. 全站导航、专页与归档体系
 
 博客具备层级清晰的栏目导航与归档体系（可在顶部导航栏直接访问）：
 
 | 页面板块 | 访问路径 | 涵盖内容与作用 |
 | :--- | :--- | :--- |
-| **文章专页** | `/posts/` | 专属深度博文列表页，支持分类即时筛选、阅读统计与杂志质感卡片呈现 |
+| **首页** | `/` | 英雄名片卡、最新文章流、生活微光手记、光影切片全屏灯箱 |
+| **文章专页** | `/posts/` | 专属深度长文列表页，支持分类即时筛选、阅读统计与杂志质感卡片呈现 |
 | **日记专页** | `/diary/` | 专属生活微光手记页，瀑布流卡片、心情与点赞互动 |
-| **文章归档** | `/archive/` | 按年份时间轴清晰列出全站所有深度博文 |
+| **文章归档** | `/archive/` | 按年份时间轴清晰列出全站所有深度长文 |
 | **日记归档** | `/diary-archive/` | 专属于日记的优雅时间轴，按年份沉淀生活碎片 |
+| **相册专页** | `/gallery/` | 摄影 / 日常 / 动漫三分区展示，含拍摄日期与大图灯箱 |
+| **资料库** | `/resources/` | 公开 PDF 文档、学术报告与代码包下载阅读 |
+| **友人帐** | `/friends/` | 友情链接展示与互动卡片 |
+| **留言板** | `/guestbook/` | 基于 Giscus (GitHub Discussions) 的沉浸式评论社区 |
 | **文章分类** | `/categories/` | 按技术、读书、随笔等主题分类汇总文章 |
 | **日记分类** | `/diary_categories/` | 日记专属分类聚合（日常生活、折腾记录、灵感随想等） |
 | **全站标签** | `/tags/` | 汇聚博文与日记的所有标签云，支持快速交叉检索 |
 
 ---
 
-## 4. 本地调试与上传 GitHub 操作流程（必读命令）
+## 5. 本地调试、版本发布与上传 GitHub 操作流程（必读命令）
 
 日常写博客、调试样式或部署更新的标准工作流程：
 
@@ -373,7 +441,17 @@ git push origin main
 ```
 > 💡 也可直接在控制台的「🚀 部署到 GitHub」面板中单键完成上述 Git 流程。
 
-### 步骤 4：验证线上发布
+### 步骤 4：创建正式发布版本（GitHub Release）
+当完成重大更新或版本发布时，推荐打上规范的 Git Tag：
+```bash
+# 创建附注标签
+git tag -a v1.0.0 -m "Release v1.0.0: 有珠之夜正式发布版"
+
+# 将标签推送到 GitHub（GitHub 将自动创建 Release）
+git push origin v1.0.0
+```
+
+### 步骤 5：验证线上发布
 1. 访问 GitHub 仓库主页：[https://github.com/find-xin/find-xin.github.io](https://github.com/find-xin/find-xin.github.io)
 2. 点击顶部的 **Actions** 标签页，查看 `Deploy Hugo site to Pages` 工作流运行状态（约 30 秒至 1 分钟）。
 3. 部署成功后，访问线上博客：**[https://find-xin.github.io/](https://find-xin.github.io/)**。
@@ -381,7 +459,7 @@ git push origin main
 
 ---
 
-## 5. 常见问题与避坑提示（含 Slug 命名规范）
+## 6. 常见问题与避坑提示（含 Slug 命名规范）
 
 ### 1. 关于文章 Slug（URL 路径标识）的规则与建议
 Slug 是文章在网址中的“唯一英文代号”（如 `https://域名/posts/my-slug/`）：
