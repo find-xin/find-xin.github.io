@@ -83,7 +83,7 @@
           {{ $tagsStr := delimit .tags " " }}
           <figure class="album-card" id="album-{{ .number }}" data-category="photography" data-tags="{{ $tagsStr }}">
             <div class="album-card-media">
-              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "摄影 %v" .number) }}" data-category="摄影" data-tags="{{ delimit .tags " · " }}">
+              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "摄影 %v" .number) }}" data-category="摄影" data-date="{{ .date }}" data-tags="{{ delimit .tags " · " }}">
                 <img src="{{ .image | relURL }}" alt="{{ .caption }}" style="aspect-ratio: {{ .ratio }}" loading="lazy">
                 <div class="album-card-overlay">
                   <span class="album-view-icon">🔍 放大欣赏</span>
@@ -96,6 +96,14 @@
                 <span class="album-card-caption">{{ .caption }}</span>
                 <span class="album-card-num">#{{ .number }}</span>
               </div>
+              {{ with .date }}
+                <div class="album-card-meta-row">
+                  <time class="album-card-date" datetime="{{ . }}">
+                    <svg class="album-date-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span>{{ . }}</span>
+                  </time>
+                </div>
+              {{ end }}
               {{ with .tags }}
                 <div class="album-card-tags">
                   {{ range . }}
@@ -149,7 +157,7 @@
           {{ $tagsStr := delimit .tags " " }}
           <figure class="album-card" id="album-{{ .number }}" data-category="daily" data-tags="{{ $tagsStr }}">
             <div class="album-card-media">
-              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "日常 %v" .number) }}" data-category="日常" data-tags="{{ delimit .tags " · " }}">
+              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "日常 %v" .number) }}" data-category="日常" data-date="{{ .date }}" data-tags="{{ delimit .tags " · " }}">
                 <img src="{{ .image | relURL }}" alt="{{ .caption }}" style="aspect-ratio: {{ .ratio }}" loading="lazy">
                 <div class="album-card-overlay">
                   <span class="album-view-icon">🔍 放大欣赏</span>
@@ -162,6 +170,14 @@
                 <span class="album-card-caption">{{ .caption }}</span>
                 <span class="album-card-num">#{{ .number }}</span>
               </div>
+              {{ with .date }}
+                <div class="album-card-meta-row">
+                  <time class="album-card-date" datetime="{{ . }}">
+                    <svg class="album-date-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span>{{ . }}</span>
+                  </time>
+                </div>
+              {{ end }}
               {{ with .tags }}
                 <div class="album-card-tags">
                   {{ range . }}
@@ -215,7 +231,7 @@
           {{ $tagsStr := delimit .tags " " }}
           <figure class="album-card" id="album-{{ .number }}" data-category="anime" data-tags="{{ $tagsStr }}">
             <div class="album-card-media">
-              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "动漫收藏 %v" .number) }}" data-category="动漫" data-tags="{{ delimit .tags " · " }}">
+              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "动漫收藏 %v" .number) }}" data-category="动漫" data-date="{{ .date }}" data-tags="{{ delimit .tags " · " }}">
                 <img src="{{ .image | relURL }}" alt="{{ .caption }}" style="aspect-ratio: {{ .ratio }}" loading="lazy">
                 <div class="album-card-overlay">
                   <span class="album-view-icon">🔍 放大欣赏</span>
@@ -228,6 +244,14 @@
                 <span class="album-card-caption">{{ .caption }}</span>
                 <span class="album-card-num">#{{ .number }}</span>
               </div>
+              {{ with .date }}
+                <div class="album-card-meta-row">
+                  <time class="album-card-date" datetime="{{ . }}">
+                    <svg class="album-date-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span>{{ . }}</span>
+                  </time>
+                </div>
+              {{ end }}
               {{ with .tags }}
                 <div class="album-card-tags">
                   {{ range . }}
@@ -245,30 +269,7 @@
   </div>
 </section>
 
-<!-- 全屏大图灯箱 (Lightbox) -->
-<dialog class="lightbox" aria-label="相片欣赏">
-  <div class="lightbox-top">
-    <div class="lightbox-meta">
-      <span class="lightbox-category-tag"></span>
-      <span class="lightbox-count"></span>
-    </div>
-    <button class="lightbox-close" aria-label="关闭画作" autofocus>关闭 ×</button>
-  </div>
-  <div class="lightbox-stage">
-    <img class="lightbox-image" alt="">
-  </div>
-  <div class="lightbox-bottom">
-    <button class="lightbox-nav-btn lightbox-prev" aria-label="上一幅">← 上一幅</button>
-    <div class="lightbox-center-info">
-      <p class="lightbox-caption"></p>
-      <div class="lightbox-sub-info">
-        <span class="lightbox-tags-display"></span>
-        <a class="lightbox-original" target="_blank" rel="noopener">查看原图 ↗</a>
-      </div>
-    </div>
-    <button class="lightbox-nav-btn lightbox-next" aria-label="下一幅">下一幅 →</button>
-  </div>
-</dialog>
+{{ partial "lightbox.html" . }}
 
 {{ $galleryJS := resources.Get "js/gallery.js" | minify | fingerprint }}
 <script src="{{ $galleryJS.RelPermalink }}" integrity="{{ $galleryJS.Data.Integrity }}" defer></script>

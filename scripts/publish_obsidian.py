@@ -132,6 +132,49 @@ def convert_to_webp_if_possible(src_file: Path, dest_dir: Path, base_clean_name:
     shutil.copy2(src_file, fallback_dest)
     return base_clean_name
 
+def parse_frontmatter_full(content: str):
+    """详细解析文章头部的 Front Matter，包括 tags、categories 等列表"""
+    fm = {}
+    body = content
+    if content.startswith('---'):
+        parts = content.split('---', 2)
+        if len(parts) >= 3:
+            fm_text = parts[1]
+            body = parts[2].lstrip('\n')
+            for line in fm_text.splitlines():
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if ':' in line:
+                    key, val = line.split(':', 1)
+                    key = key.strip()
+                    val = val.strip().strip("'\"")
+                    fm[key] = val
+
+            tags = []
+            m_tags_inline = re.search(r'tags:\s*\[(.*?)\]', fm_text)
+            if m_tags_inline:
+                tags = [t.strip().strip('\'\"') for t in m_tags_inline.group(1).split(',') if t.strip()]
+            else:
+                m_tags_block = re.search(r'tags:\s*\n((?:\s*-\s*.*\n)+)', fm_text)
+                if m_tags_block:
+                    tags = [re.sub(r'^\s*-\s*', '', l).strip().strip('\'\"') for l in m_tags_block.group(1).splitlines() if l.strip()]
+            fm['parsed_tags'] = tags
+
+            cats = []
+            m_cat_inline = re.search(r'(?:diary_categories|categories):\s*\[(.*?)\]', fm_text)
+            if m_cat_inline:
+                cats = [t.strip().strip('\'\"') for t in m_cat_inline.group(1).split(',') if t.strip()]
+            else:
+                m_cat_single = re.search(r'(?:diary_category|diary_categories|category|categories):\s*([^\n\[]+)', fm_text)
+                if m_cat_single:
+                    val = m_cat_single.group(1).strip().strip('\'\"')
+                    if val:
+                        cats = [val]
+            fm['parsed_categories'] = cats
+
+    return fm, body
+
 def get_all_articles():
     """获取全站所有文章与日记结构化数据"""
     posts_dir = BLOG_ROOT / 'content' / 'posts'
@@ -150,10 +193,12 @@ def get_all_articles():
             
             with open(md_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            fm, _ = parse_frontmatter(content)
+            fm, _ = parse_frontmatter_full(content)
             title = fm.get('title', item.stem)
             draft = fm.get('draft', 'false').lower() == 'true'
-            date = fm.get('date', '未知日期')[:10]
+            raw_date = fm.get('date', '')
+            date_display = raw_date[:10] if raw_date else '未知日期'
+            lastmod = fm.get('lastmod', '')
             cover = fm.get('cover', '')
             if cover and not cover.startswith('/') and not cover.startswith('http'):
                 cover = f"/{'posts' if type_key == 'post' else 'diary'}/{item.stem}/{cover}"
@@ -164,7 +209,12 @@ def get_all_articles():
                 'slug': item.stem,
                 'title': title,
                 'draft': draft,
-                'date': date,
+                'date': date_display,
+                'raw_date': raw_date,
+                'lastmod': lastmod,
+                'tags': fm.get('parsed_tags', []),
+                'categories': fm.get('parsed_categories', []),
+                'summary': fm.get('summary', ''),
                 'cover': cover,
                 'url': f"/{'posts' if type_key == 'post' else 'diary'}/{item.stem}/",
                 'path': str(item.relative_to(BLOG_ROOT))
@@ -183,11 +233,12 @@ def list_all_articles():
     print(f"\n共找到 {len(entries)} 篇文章/日记。\n")
 
 def find_target_item(keyword: str):
-    """根据关键词在 content/posts 和 content/diary 中查找匹配的文章"""
+    """根据关键词在 content/posts 和 content/diary 中查找匹配的文章（优先精确匹配 slug）"""
     keyword_clean = keyword.strip().lower()
     posts_dir = BLOG_ROOT / 'content' / 'posts'
     diaries_dir = BLOG_ROOT / 'content' / 'diary'
 
+    # 第一轮：精确匹配 slug (item.stem 或 item.name)
     for base_dir in [posts_dir, diaries_dir]:
         if not base_dir.exists():
             continue
@@ -197,12 +248,21 @@ def find_target_item(keyword: str):
             md_path = item / 'index.md' if item.is_dir() else item
             if not md_path.exists() or md_path.suffix != '.md':
                 continue
-            
-            # 匹配 slug
+            if item.stem.lower() == keyword_clean or item.name.lower() == keyword_clean:
+                return item, md_path
+
+    # 第二轮：模糊/子串匹配
+    for base_dir in [posts_dir, diaries_dir]:
+        if not base_dir.exists():
+            continue
+        for item in base_dir.iterdir():
+            if item.name.startswith(('.', '_')):
+                continue
+            md_path = item / 'index.md' if item.is_dir() else item
+            if not md_path.exists() or md_path.suffix != '.md':
+                continue
             if keyword_clean in item.name.lower():
                 return item, md_path
-            
-            # 匹配 title
             try:
                 with open(md_path, 'r', encoding='utf-8') as f:
                     content = f.read()
@@ -212,6 +272,189 @@ def find_target_item(keyword: str):
             except Exception:
                 pass
     return None, None
+
+def edit_article_meta(slug: str, new_slug: str = None, title: str = None, tags: list[str] = None, categories: list[str] = None, summary: str = None, update_lastmod: bool = False) -> tuple[bool, str]:
+    """编辑文章或日记的元数据（标题、标识slug、标签、分类、摘要）。若 update_lastmod 为 False，不改变任何更新时间。"""
+    target_item, md_path = find_target_item(slug)
+    if not target_item or not md_path:
+        return False, f"未找到文章或日记：'{slug}'"
+
+    renamed = False
+    old_slug = slug
+    final_slug = slug
+    type_key = target_item.get('type', 'post')
+    old_url = f"/{'posts' if type_key == 'post' else 'diary'}/{old_slug}/"
+
+    if new_slug and new_slug.strip() and new_slug.strip() != slug:
+        clean_new_slug = new_slug.strip()
+        if any(c in clean_new_slug for c in ['/', '\\', '?', '#', '*', ':', '"', '<', '>', '|', ' ']) or clean_new_slug.startswith(('.', '_')):
+            return False, "Slug 标识不能包含空格、特殊符号（/ \\ ? # * : \" < > |）或以点和下划线开头"
+
+        # 确定新路径与重命名
+        if md_path.name == 'index.md':
+            bundle_dir = md_path.parent
+            parent_container = bundle_dir.parent
+            new_bundle_dir = parent_container / clean_new_slug
+            if new_bundle_dir.exists():
+                return False, f"标识 '{clean_new_slug}' 已存在，请更换其他标识"
+            try:
+                bundle_dir.rename(new_bundle_dir)
+                md_path = new_bundle_dir / 'index.md'
+                renamed = True
+                final_slug = clean_new_slug
+            except Exception as e:
+                return False, f"重命名目录失败: {e}"
+        else:
+            parent_container = md_path.parent
+            new_file = parent_container / f"{clean_new_slug}.md"
+            if new_file.exists():
+                return False, f"标识 '{clean_new_slug}' 已存在，请更换其他标识"
+            try:
+                md_path.rename(new_file)
+                md_path = new_file
+                renamed = True
+                final_slug = clean_new_slug
+            except Exception as e:
+                return False, f"重命名文件失败: {e}"
+
+    content = md_path.read_text(encoding='utf-8')
+    if not content.startswith('---'):
+        return False, "文章未包含标准的 YAML Front Matter 头部"
+
+    parts = content.split('---', 2)
+    if len(parts) < 3:
+        return False, "文章 Front Matter 格式不符合规范"
+
+    fm_lines = parts[1].strip('\n').splitlines()
+    body = parts[2]
+
+    is_diary = type_key == 'diary'
+    cat_key = 'diary_categories' if is_diary else 'categories'
+
+    new_fm_lines = []
+    i = 0
+    has_title = False
+    has_tags = False
+    has_cats = False
+    has_summary = False
+    has_lastmod = False
+    has_aliases = False
+    date_idx = -1
+
+    while i < len(fm_lines):
+        line = fm_lines[i]
+        stripped = line.strip()
+
+        # 处理 title
+        if stripped.startswith('title:'):
+            has_title = True
+            if title is not None and title.strip():
+                clean_title = title.strip().replace("'", "''")
+                new_fm_lines.append(f"title: '{clean_title}'")
+            else:
+                new_fm_lines.append(line)
+            i += 1
+            continue
+
+        # 处理 tags
+        if stripped.startswith('tags:'):
+            has_tags = True
+            i += 1
+            while i < len(fm_lines) and (fm_lines[i].strip().startswith('- ') or fm_lines[i].strip().startswith('#')):
+                i += 1
+            if tags is not None:
+                new_fm_lines.append(f"tags: {json.dumps(tags, ensure_ascii=False)}")
+            else:
+                new_fm_lines.append(line)
+            continue
+
+        # 处理 categories / diary_categories
+        if stripped.startswith(('categories:', 'category:', 'diary_categories:', 'diary_category:')):
+            has_cats = True
+            i += 1
+            while i < len(fm_lines) and (fm_lines[i].strip().startswith('- ') or fm_lines[i].strip().startswith('#')):
+                i += 1
+            if categories is not None:
+                new_fm_lines.append(f"{cat_key}: {json.dumps(categories, ensure_ascii=False)}")
+            else:
+                new_fm_lines.append(line)
+            continue
+
+        # 处理 aliases
+        if stripped.startswith('aliases:'):
+            has_aliases = True
+            existing_aliases = []
+            m_inline = re.search(r'aliases:\s*\[(.*?)\]', stripped)
+            if m_inline:
+                existing_aliases = [a.strip().strip('\'\"') for a in m_inline.group(1).split(',') if a.strip()]
+            i += 1
+            while i < len(fm_lines) and (fm_lines[i].strip().startswith('- ') or fm_lines[i].strip().startswith('#')):
+                if fm_lines[i].strip().startswith('- '):
+                    existing_aliases.append(re.sub(r'^\s*-\s*', '', fm_lines[i]).strip().strip('\'\"'))
+                i += 1
+            if renamed and old_url not in existing_aliases:
+                existing_aliases.append(old_url)
+            new_fm_lines.append(f"aliases: {json.dumps(existing_aliases, ensure_ascii=False)}")
+            continue
+
+        # 处理 summary
+        if stripped.startswith('summary:'):
+            has_summary = True
+            if summary is not None:
+                clean_sum = summary.strip().replace("'", "''")
+                new_fm_lines.append(f"summary: '{clean_sum}'")
+            else:
+                new_fm_lines.append(line)
+            i += 1
+            continue
+
+        # 处理 lastmod: 若 update_lastmod 为 False 则原样保留，绝不更新
+        if stripped.startswith('lastmod:'):
+            has_lastmod = True
+            if update_lastmod:
+                now_str = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+08:00')
+                new_fm_lines.append(f"lastmod: {now_str}")
+            else:
+                new_fm_lines.append(line)
+            i += 1
+            continue
+
+        if stripped.startswith('date:'):
+            date_idx = len(new_fm_lines)
+            new_fm_lines.append(line)
+            i += 1
+            continue
+
+        new_fm_lines.append(line)
+        i += 1
+
+    # 补充缺失字段
+    if not has_title and title is not None and title.strip():
+        clean_title = title.strip().replace("'", "''")
+        new_fm_lines.insert(0, f"title: '{clean_title}'")
+    if not has_tags and tags is not None:
+        new_fm_lines.append(f"tags: {json.dumps(tags, ensure_ascii=False)}")
+    if not has_cats and categories is not None and len(categories) > 0:
+        new_fm_lines.append(f"{cat_key}: {json.dumps(categories, ensure_ascii=False)}")
+    if not has_summary and summary is not None and summary.strip():
+        clean_sum = summary.strip().replace("'", "''")
+        new_fm_lines.append(f"summary: '{clean_sum}'")
+    if renamed and not has_aliases:
+        new_fm_lines.append(f"aliases:\n  - '{old_url}'")
+    if update_lastmod and not has_lastmod:
+        now_str = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+08:00')
+        if date_idx >= 0:
+            new_fm_lines.insert(date_idx + 1, f"lastmod: {now_str}")
+        else:
+            new_fm_lines.append(f"lastmod: {now_str}")
+
+    new_content = f"---\n{chr(10).join(new_fm_lines)}\n---" + body
+    md_path.write_text(new_content, encoding='utf-8')
+    msg = f"成功更新「{final_slug}」元数据！"
+    if renamed:
+        msg += f"（已修改访问路径，并自动配置原地址 {old_url} 别名重定向）"
+    return True, msg
+
 
 def set_draft_status(keyword: str, set_draft: bool):
     """下架（设为草稿）或重新上架文章"""
@@ -915,11 +1158,6 @@ def process_pdf_note(pdf_path: Path, note_type: str = 'post', custom_slug: str |
     target_pdf = target_attachments_dir / safe_name
     shutil.copy2(pdf_path, target_pdf)
 
-    # 同时复制一份到 static/resources 供外链直接下载
-    static_res_dir = BLOG_ROOT / 'static' / 'resources'
-    static_res_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(pdf_path, static_res_dir / safe_name)
-
     size_mb = round(pdf_path.stat().st_size / (1024 * 1024), 2)
     size_str = f"{size_mb} MB" if size_mb >= 1.0 else f"{round(pdf_path.stat().st_size / 1024, 1)} KB"
 
@@ -937,9 +1175,20 @@ def process_pdf_note(pdf_path: Path, note_type: str = 'post', custom_slug: str |
         "",
         f'{{{{< pdf src="attachments/{safe_name}" title="{title}" height="800px" >}}}}',
         "",
-        "> [!info] 📄 文档阅读与下载说明",
+        '<div class="pdf-download-card">',
+        '  <div class="pdf-download-info">',
+        '    <span class="pdf-download-icon">📕</span>',
+        '    <div>',
+        f'      <div class="pdf-download-name">{pdf_path.name}</div>',
+        f'      <div class="pdf-download-meta">格式：PDF 电子文档 · 大小：{size_str}</div>',
+        '    </div>',
+        '  </div>',
+        f'  <a href="attachments/{safe_name}" download class="pdf-download-btn">⬇️ 下载此 PDF 原文</a>',
+        '</div>',
+        "",
+        "> [!info] 📄 文档阅读与操作提示",
         f"> - 本篇笔记为独立 PDF 格式文档，大小约 **{size_str}**。",
-        "> - 支持在上方内置阅读器中直接预览，点击右上角可开启 **全屏阅读** 或直接 **下载原始文件** 离线阅读。",
+        "> - 支持在上方内置阅读器中直接浏览与缩放，点击右上角可开启 **全屏阅读** 或在新窗口打开，也可以通过上方及下方按钮直接 **下载原始文件** 离线阅读。",
         ""
     ]
     if description:
@@ -952,8 +1201,9 @@ def process_pdf_note(pdf_path: Path, note_type: str = 'post', custom_slug: str |
 
     index_md = target_dir / "index.md"
     index_md.write_text("\n".join(fm_lines), encoding='utf-8')
-    print(f"✨ 成功生成 PDF 笔记页面：{index_md}")
-    print(f"   文章路径：/posts/{slug}/")
+    print(f"✨ 成功生成 PDF 文章页面：{index_md}")
+    print(f"   文章路径：/{'diary' if note_type == 'diary' else 'posts'}/{slug}/")
+    print(f"   📎 专属附件：attachments/{safe_name}（仅作为文章专属附件，未放入全站资料库）")
     return True
 
 def main():

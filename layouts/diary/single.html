@@ -10,7 +10,8 @@
           <div class="diary-author-info-text">
             <span class="diary-author-name">{{ site.Params.author }}</span>
             <div class="diary-author-sub">
-              <time datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ .Date.Format "2006年01月02日 15:04" }}</time>
+              {{ range (.GetTerms "diary_categories") }}<a class="diary-cat-pill" href="{{ .RelPermalink }}">📖 {{ .LinkTitle }}</a>{{ end }}
+              <time datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ .Date.Format "2006-01-02 15:04" }}</time>
               {{ with .Params.mood }}<span class="diary-mood-tag">{{ . }}</span>{{ else }}{{ with .Params.weather }}<span class="diary-mood-tag">{{ . }}</span>{{ end }}{{ end }}
             </div>
           </div>
@@ -75,11 +76,18 @@
 
     {{ $postID := .File.UniqueID | default .RelPermalink }}
     <div class="diary-detail-actions">
+      <div class="diary-action-spacer" aria-hidden="true"></div>
+
       <button class="diary-detail-like-btn" type="button" data-id="{{ $postID }}" data-likes="{{ .Params.likes | default 5 }}">
         <span class="heart-icon">♡</span>
         <span class="like-label">喜欢</span>
         <span class="like-count">{{ .Params.likes | default 5 }}</span>
       </button>
+
+      <div class="diary-lastmod-text">
+        <svg class="diary-lastmod-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>最后更新于 {{ .Lastmod.Format "2006-01-02 15:04" }}</span>
+      </div>
     </div>
 
     <nav class="diary-nav-bar" aria-label="相邻日记">

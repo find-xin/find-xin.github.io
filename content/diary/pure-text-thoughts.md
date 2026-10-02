@@ -7,6 +7,7 @@ cover: ''
 mood: '✨ 思考'
 weather: '多云'
 tags: ['随笔', '思考']
+diary_categories: ['灵感随想']
 likes: 19
 ---
 

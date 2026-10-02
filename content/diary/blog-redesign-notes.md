@@ -8,6 +8,7 @@ coverRatio: '4/5'
 mood: '💻 灵感'
 weather: '晴'
 tags: ['开发', '博客', '灵感']
+diary_categories: ['折腾记录']
 likes: 52
 ---
 

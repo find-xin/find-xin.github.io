@@ -42,6 +42,7 @@
         {{ if $coverUrl }}
           <div class="diary-card-cover">
             <div class="diary-badges-row">
+              {{ range (.GetTerms "diary_categories") }}<span class="diary-badge diary-badge-cat">{{ .LinkTitle }}</span>{{ end }}
               {{ with .Params.mood }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ else }}{{ with .Params.weather }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ end }}{{ end }}
               {{ if .Params.pinned }}<span class="diary-badge diary-badge-pinned">置顶</span>{{ end }}
               {{ with .Params.photos }}<span class="diary-badge diary-badge-photos">📷 {{ len . }}</span>{{ end }}
@@ -54,6 +55,7 @@
           <div class="diary-card-text-cover">
             <span class="diary-quote-watermark" aria-hidden="true">“</span>
             <div class="diary-badges-row">
+              {{ range (.GetTerms "diary_categories") }}<span class="diary-badge diary-badge-cat">{{ .LinkTitle }}</span>{{ end }}
               {{ with .Params.mood }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ else }}{{ with .Params.weather }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ end }}{{ end }}
               {{ if .Params.pinned }}<span class="diary-badge diary-badge-pinned">置顶</span>{{ end }}
             </div>

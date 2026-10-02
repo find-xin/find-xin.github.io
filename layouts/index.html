@@ -119,11 +119,11 @@
   {{ range first 2 (where $allImages "category" "anime") }}{{ $homeSamples = $homeSamples | append . }}{{ end }}
   <div class="home-gallery-grid">
     {{ range $homeSamples }}
-      <a class="home-gallery-card" href="{{ "gallery/" | relURL }}#{{ .category }}" title="{{ .caption }}">
+      <a class="home-gallery-card gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption }}" data-category="{{ if eq .category "photography" }}摄影{{ else if eq .category "daily" }}日常{{ else }}动漫{{ end }}" data-date="{{ .date }}" data-tags="{{ delimit .tags " · " }}" title="{{ .caption }}">
         <div class="home-gallery-media">
           <img src="{{ .image | relURL }}" alt="{{ .caption }}" loading="lazy">
           <div class="home-gallery-overlay">
-            <span class="home-gallery-zoom">欣赏相片 ↗</span>
+            <span class="home-gallery-zoom">🔍 放大欣赏</span>
           </div>
           <span class="album-card-badge">{{ if eq .category "photography" }}📷 摄影{{ else if eq .category "daily" }}☕ 日常{{ else }}🎨 动漫{{ end }}</span>
         </div>
@@ -137,4 +137,7 @@
 </section>
 {{ end }}
 
+{{ partial "lightbox.html" . }}
+{{ $galleryJS := resources.Get "js/gallery.js" | minify | fingerprint }}
+<script src="{{ $galleryJS.RelPermalink }}" integrity="{{ $galleryJS.Data.Integrity }}" defer></script>
 {{ end }}

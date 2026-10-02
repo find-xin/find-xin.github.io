@@ -24,6 +24,7 @@ import shutil
 import socket
 import re
 import time
+import atexit
 from pathlib import Path
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
@@ -35,6 +36,7 @@ from publish_obsidian import (
     get_all_articles,
     set_draft_status,
     delete_article,
+    edit_article_meta,
     process_obsidian_note,
     process_ipynb_notebook,
     process_pdf_note,
@@ -62,9 +64,49 @@ MIME_TYPES = {
     '.zip': 'application/zip',
 }
 
+def is_hugo_running() -> bool:
+    global HUGO_PROCESS
+    if HUGO_PROCESS is not None and HUGO_PROCESS.poll() is None:
+        return True
+    for pgrep_bin in ['/usr/bin/pgrep', 'pgrep']:
+        try:
+            res = subprocess.run([pgrep_bin, '-f', 'hugo server'], capture_output=True, text=True, timeout=0.5)
+            if res.returncode == 0 and res.stdout.strip():
+                return True
+        except Exception:
+            pass
+    for lsof_bin in ['/usr/sbin/lsof', 'lsof']:
+        try:
+            res = subprocess.run([lsof_bin, '-ti:1314'], capture_output=True, text=True, timeout=0.5)
+            if res.returncode == 0 and res.stdout.strip():
+                return True
+        except Exception:
+            pass
+    for host, family in [('127.0.0.1', socket.AF_INET), ('::1', socket.AF_INET6), ('localhost', socket.AF_INET)]:
+        try:
+            with socket.socket(family, socket.SOCK_STREAM) as s:
+                s.settimeout(0.2)
+                if s.connect_ex((host, 1314)) == 0:
+                    return True
+        except Exception:
+            pass
+    return False
+
 def is_port_in_use(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('127.0.0.1', port)) == 0
+    if port == 1314:
+        return is_hugo_running()
+    try:
+        res = subprocess.run(['lsof', f'-ti:{port}'], capture_output=True, text=True, timeout=0.5)
+        if res.returncode == 0 and res.stdout.strip():
+            return True
+    except Exception:
+        pass
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.2)
+            return s.connect_ex(('127.0.0.1', port)) == 0
+    except Exception:
+        return False
 
 def get_available_port(start_port: int = 2026) -> int:
     for p in range(start_port, start_port + 20):
@@ -72,19 +114,49 @@ def get_available_port(start_port: int = 2026) -> int:
             return p
     return start_port
 
+def get_hugo_bin() -> str:
+    candidates = [
+        shutil.which('hugo'),
+        '/opt/homebrew/bin/hugo',
+        '/usr/local/bin/hugo',
+        str(Path.home() / 'go/bin/hugo'),
+    ]
+    for c in candidates:
+        if c and Path(c).is_file() and os.access(c, os.X_OK):
+            return c
+    return 'hugo'
+
 def start_hugo_server():
     global HUGO_PROCESS
-    if is_port_in_use(1314):
-        return True, "Hugo 服务已在运行中 (端口 1314)"
+    if is_hugo_running():
+        return True, "Hugo 本地预览服务运行中 (1314)"
+    
+    # 清理任何僵死占用 1314 端口的进程
     try:
+        subprocess.run(['pkill', '-9', '-f', 'hugo server'], capture_output=True)
+    except Exception:
+        pass
+    time.sleep(0.2)
+
+    try:
+        hugo_bin = get_hugo_bin()
+        env = os.environ.copy()
+        env['PATH'] = f"/opt/homebrew/bin:/usr/local/bin:{env.get('PATH', '')}"
         HUGO_PROCESS = subprocess.Popen(
-            ['hugo', 'server', '-D', '--port', '1314', '--bind', '127.0.0.1', '--disableFastRender'],
+            [hugo_bin, 'server', '-D', '--port', '1314', '--bind', '0.0.0.0', '-b', 'http://localhost:1314/', '--disableFastRender'],
             cwd=BLOG_ROOT,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.PIPE,
+            env=env
         )
-        time.sleep(1)
-        return True, "已启动 Hugo 本地预览服务"
+        for _ in range(25):
+            time.sleep(0.1)
+            if is_hugo_running():
+                return True, "已成功启动 Hugo 本地预览服务 (1314)"
+            if HUGO_PROCESS.poll() is not None:
+                err = HUGO_PROCESS.stderr.read().decode('utf-8', errors='ignore')
+                return False, f"Hugo 启动失败: {err[:200] or '进程异常退出'}"
+        return True, "Hugo 服务已启动"
     except Exception as e:
         return False, f"启动 Hugo 失败: {e}"
 
@@ -93,15 +165,23 @@ def stop_hugo_server():
     if HUGO_PROCESS and HUGO_PROCESS.poll() is None:
         try:
             HUGO_PROCESS.terminate()
-            HUGO_PROCESS.wait(timeout=2)
+            HUGO_PROCESS.wait(timeout=1.5)
         except Exception:
             HUGO_PROCESS.kill()
-        HUGO_PROCESS = None
+    HUGO_PROCESS = None
     try:
-        subprocess.run(['pkill', '-f', 'hugo server'], capture_output=True)
+        subprocess.run(['pkill', '-9', '-f', 'hugo server'], capture_output=True)
     except Exception:
         pass
-    return True, "已停止 Hugo 服务"
+    try:
+        res = subprocess.run(['lsof', '-ti:1314'], capture_output=True, text=True)
+        for pid in res.stdout.split():
+            if pid.strip():
+                subprocess.run(['kill', '-9', pid.strip()], capture_output=True)
+    except Exception:
+        pass
+    time.sleep(0.3)
+    return True, "已停止 Hugo 预览服务"
 
 def pick_file_macos(prompt="选择文件", file_types='{"md", "ipynb", "pdf", "markdown"}', is_folder=False) -> str:
     """调用 macOS 系统级原生文件或目录选择框"""
@@ -184,6 +264,8 @@ def get_gallery_images():
                 item['number'] = line.split('number:', 1)[1].strip().strip('\"\'')
             elif line.startswith('category:'):
                 item['category'] = line.split('category:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('date:'):
+                item['date'] = line.split('date:', 1)[1].strip().strip('\"\'')
             elif line.startswith('caption:'):
                 item['caption'] = line.split('caption:', 1)[1].strip().strip('\"\'')
             elif line.startswith('tags:'):
@@ -281,6 +363,7 @@ def add_gallery_image(raw_path: str, category: str, caption: str, tags: list[str
     ratio: {ratio:.4f}
     number: "{num_str}"
     category: "{category}"
+    date: '{datetime.now().strftime("%Y-%m-%d")}'
     caption: '{caption_clean}'
     tags: {tags_formatted}
     source: '{src.name}'"""
@@ -327,6 +410,84 @@ def delete_gallery_image(image_url: str) -> tuple[bool, str]:
         except Exception:
             pass
     return True, "已成功从相册中移除"
+
+def update_gallery_image(image_url: str, new_caption: str = None, new_category: str = None, new_tags: list[str] = None, new_date: str = None) -> tuple[bool, str]:
+    """更新相册图片的描述配文、分类、标签与日期"""
+    if not GALLERY_YAML.exists():
+        return False, "找不到 data/gallery.yaml"
+    content = GALLERY_YAML.read_text(encoding='utf-8')
+
+    pattern = rf'([ \t]*- image:\s*[\"\'\s]*{re.escape(image_url)}[\"\'\s]*\n)([\s\S]*?)(?=(?:[ \t]*- image:|\n\s*# =+|\Z))'
+    match = re.search(pattern, content)
+    if not match:
+        return False, "未在相册中找到该图片记录"
+
+    header = match.group(1)
+    body = match.group(2)
+
+    lines = body.splitlines()
+    new_lines = []
+    has_caption = False
+    has_cat = False
+    has_tags = False
+    has_date = False
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        if stripped.startswith('caption:'):
+            has_caption = True
+            if new_caption is not None:
+                clean_cap = new_caption.replace("'", "''")
+                new_lines.append(f"    caption: '{clean_cap}'")
+            else:
+                new_lines.append(line)
+            i += 1
+            continue
+        if stripped.startswith('category:'):
+            has_cat = True
+            if new_category is not None:
+                new_lines.append(f'    category: "{new_category}"')
+            else:
+                new_lines.append(line)
+            i += 1
+            continue
+        if stripped.startswith('date:'):
+            has_date = True
+            if new_date is not None:
+                new_lines.append(f"    date: '{new_date.strip()}'")
+            else:
+                new_lines.append(line)
+            i += 1
+            continue
+        if stripped.startswith('tags:'):
+            has_tags = True
+            i += 1
+            while i < len(lines) and (lines[i].strip().startswith('- ') or lines[i].strip().startswith('#')):
+                i += 1
+            if new_tags is not None:
+                new_lines.append(f"    tags: {json.dumps(new_tags, ensure_ascii=False)}")
+            else:
+                new_lines.append(line)
+            continue
+        new_lines.append(line)
+        i += 1
+
+    if not has_caption and new_caption is not None:
+        clean_cap = new_caption.replace("'", "''")
+        new_lines.append(f"    caption: '{clean_cap}'")
+    if not has_cat and new_category is not None:
+        new_lines.append(f'    category: "{new_category}"')
+    if not has_date and new_date is not None:
+        new_lines.append(f"    date: '{new_date.strip()}'")
+    if not has_tags and new_tags is not None:
+        new_lines.append(f"    tags: {json.dumps(new_tags, ensure_ascii=False)}")
+
+    new_block = header + "\n".join(new_lines) + "\n"
+    new_content = content[:match.start()] + new_block + content[match.end():]
+    GALLERY_YAML.write_text(new_content, encoding='utf-8')
+    return True, "相册作品信息已成功更新"
 
 def get_git_status():
     try:
@@ -387,51 +548,65 @@ def create_site_backup() -> tuple[bool, str]:
 RECENT_NOTES_CACHE = {'timestamp': 0, 'data': []}
 
 def scan_recent_notes(vault_dir_str: str = ""):
-    """探测扫描近期修改的 Markdown、Notebook 或 PDF（带30秒极速内存缓存）"""
+    """探测扫描近期修改的 Markdown、Notebook 或 PDF（极速轻量扫描 + 60秒缓存）"""
     global RECENT_NOTES_CACHE
     now = time.time()
-    if not vault_dir_str and now - RECENT_NOTES_CACHE['timestamp'] < 30 and RECENT_NOTES_CACHE['data']:
+    if not vault_dir_str and now - RECENT_NOTES_CACHE['timestamp'] < 60 and RECENT_NOTES_CACHE['data']:
         return RECENT_NOTES_CACHE['data']
 
-    search_dirs = []
+    search_targets = []
     if vault_dir_str.strip():
-        search_dirs.append(Path(vault_dir_str).expanduser())
+        search_targets.append((Path(vault_dir_str).expanduser(), 2))
     home = Path.home()
-    search_dirs.extend([
-        home / 'Desktop' / 'Notes',
-        home / 'Documents' / 'Obsidian',
-        home / 'Desktop',
-        home / 'Downloads',
+    search_targets.extend([
+        (home / 'Desktop' / 'Notes', 2),
+        (home / 'Documents' / 'Obsidian', 2),
+        (BLOG_ROOT / 'content', 2),
+        (home / 'Desktop', 1),     # 桌面仅扫描第1级，避免卡顿
+        (home / 'Downloads', 1),   # 下载目录仅扫描第1级
     ])
     
     seen = set()
     found = []
-    for sdir in search_dirs:
+    for sdir, max_depth in search_targets:
         if not sdir.exists():
             continue
         try:
-            for root, dirs, files in os.walk(sdir):
-                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('node_modules', 'Library', '.git', 'site-packages', 'venv', 'youshu-night')]
-                rel_parts = Path(root).relative_to(sdir).parts
-                if len(rel_parts) > 2:
-                    continue
-                for f in files:
-                    if f.startswith('.'):
+            if max_depth == 1:
+                with os.scandir(sdir) as it:
+                    for entry in it:
+                        if entry.is_file(follow_symlinks=False) and not entry.name.startswith('.'):
+                            low = entry.name.lower()
+                            if low.endswith('.md') or low.endswith('.ipynb') or low.endswith('.pdf'):
+                                p = Path(entry.path)
+                                if p not in seen:
+                                    seen.add(p)
+                                    try:
+                                        found.append((entry.stat(follow_symlinks=False).st_mtime, p))
+                                    except Exception:
+                                        pass
+            else:
+                for root, dirs, files in os.walk(sdir):
+                    dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('node_modules', 'Library', '.git', 'site-packages', 'venv', 'youshu-night', 'Trash')]
+                    rel_parts = Path(root).relative_to(sdir).parts
+                    if len(rel_parts) >= max_depth:
                         continue
-                    low_f = f.lower()
-                    if low_f.endswith('.md') or low_f.endswith('.ipynb') or low_f.endswith('.pdf'):
-                        p = Path(root) / f
-                        if p not in seen:
-                            seen.add(p)
-                            try:
-                                found.append((p.stat().st_mtime, p))
-                            except Exception:
-                                pass
+                    for f in files:
+                        if f.startswith('.'):
+                            continue
+                        low = f.lower()
+                        if low.endswith('.md') or low.endswith('.ipynb') or low.endswith('.pdf'):
+                            p = Path(root) / f
+                            if p not in seen:
+                                seen.add(p)
+                                try:
+                                    found.append((p.stat().st_mtime, p))
+                                except Exception:
+                                    pass
         except Exception:
             pass
 
     found.sort(key=lambda x: x[0], reverse=True)
-    now = time.time()
     results = []
     for mtime, p in found[:10]:
         diff = now - mtime
@@ -447,6 +622,9 @@ def scan_recent_notes(vault_dir_str: str = ""):
             'rel_time': rel,
             'ext': p.suffix.lower()
         })
+    if not vault_dir_str:
+        RECENT_NOTES_CACHE['timestamp'] = now
+        RECENT_NOTES_CACHE['data'] = results
     return results
 
 HTML_PAGE = """<!DOCTYPE html>
@@ -865,14 +1043,14 @@ HTML_PAGE = """<!DOCTYPE html>
       border-color: var(--primary);
     }
 
-    /* 画廊大图预览 Lightbox 模态框 */
+    /* 画廊与快捷编辑 模态框通用结构 */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(0, 0, 0, 0.75);
+      background: rgba(0, 0, 0, 0.65);
       backdrop-filter: blur(8px);
       z-index: 9999;
       display: none;
@@ -883,6 +1061,7 @@ HTML_PAGE = """<!DOCTYPE html>
     .modal-overlay.is-active { display: flex; }
     .modal-content {
       background: var(--card-bg);
+      color: var(--text);
       border: 1px solid var(--border);
       border-radius: 14px;
       max-width: 900px;
@@ -891,22 +1070,45 @@ HTML_PAGE = """<!DOCTYPE html>
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
     }
     .modal-header {
-      padding: 14px 20px;
+      padding: 16px 22px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      background: var(--card-bg);
+      color: var(--text);
+    }
+    .modal-header h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
     }
     .modal-body {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 20px;
+      padding: 20px 24px;
       overflow-y: auto;
+      background: var(--card-bg);
+      color: var(--text);
+    }
+    .modal-footer {
+      padding: 14px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+    }
+
+    /* 仅针对全屏画廊图片 Lightbox 模态框使用全黑居中背景 */
+    #gallery-modal .modal-body {
+      align-items: center;
+      justify-content: center;
       background: #000;
+      padding: 20px;
     }
     .modal-img {
       max-width: 100%;
@@ -914,13 +1116,26 @@ HTML_PAGE = """<!DOCTYPE html>
       object-fit: contain;
       border-radius: 8px;
     }
-    .modal-footer {
-      padding: 14px 20px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--card-bg);
+
+    /* 模态框提示卡片 */
+    .modal-notice-box {
+      padding: 12px 14px;
+      background: var(--card-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-top: 6px;
+    }
+    .modal-notice-title {
+      font-weight: 600;
+      font-size: 0.86rem;
+      color: var(--text);
+    }
+    .modal-notice-desc {
+      font-weight: 400;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.45;
     }
 
     /* 模式切换与选项卡 */
@@ -947,11 +1162,11 @@ HTML_PAGE = """<!DOCTYPE html>
   <header class="header">
     <div class="header-left">
       <div class="brand-title"><span>✦</span> 有珠之夜 · 博客管理台</div>
-      <div id="hugo-status-badge" class="status-badge">
+      <div id="hugo-status-badge" class="__HUGO_BADGE_CLASS__">
         <span class="status-dot"></span>
-        <span id="hugo-status-text">检测 Hugo 服务中...</span>
+        <span id="hugo-status-text">__HUGO_STATUS_TEXT__</span>
       </div>
-      <button class="btn btn-sm" id="hugo-toggle-btn" onclick="toggleHugo()">▶️ 启动 Hugo</button>
+      <button class="__HUGO_BTN_CLASS__" id="hugo-toggle-btn" onclick="toggleHugo()">__HUGO_BTN_TEXT__</button>
     </div>
     <div class="header-right">
       <a class="btn" href="http://localhost:1314/" target="_blank" rel="noopener">🌐 本地预览 (1314)</a>
@@ -967,15 +1182,15 @@ HTML_PAGE = """<!DOCTYPE html>
       </button>
       <button class="tab-btn" id="tab-btn-resources" onclick="switchTab('resources')">
         <span>📦 资料库与附件管理</span>
-        <span class="tab-counter" id="resources-counter">--</span>
+        <span class="tab-counter" id="resources-counter">__RESOURCES_COUNT__</span>
       </button>
       <button class="tab-btn" id="tab-btn-gallery" onclick="switchTab('gallery')">
         <span>🖼️ 光影相册管理</span>
-        <span class="tab-counter" id="gallery-counter">--</span>
+        <span class="tab-counter" id="gallery-counter">__GALLERY_COUNT__</span>
       </button>
       <button class="tab-btn" id="tab-btn-manage" onclick="switchTab('manage')">
         <span>📚 全站文章管理</span>
-        <span class="tab-counter" id="articles-counter">--</span>
+        <span class="tab-counter" id="articles-counter">__ARTICLES_COUNT__</span>
       </button>
       <button class="tab-btn" id="tab-btn-deploy" onclick="switchTab('deploy')">
         <span>🚀 部署到 GitHub</span>
@@ -990,7 +1205,7 @@ HTML_PAGE = """<!DOCTYPE html>
         <h2 class="card-title">
           <span><span class="step-badge">1</span> 选择笔记、Notebook 或 PDF 文件</span>
         </h2>
-        <p class="card-desc">支持 Obsidian Markdown 笔记（自动抽取 attachments/ 并转为 WebP）、Jupyter Notebook（.ipynb，自动抽取代码与图表）以及 PDF 笔记（.pdf，自动生成内嵌交互阅读文章）。</p>
+        <p class="card-desc">支持 Obsidian Markdown 笔记（自动抽取 attachments/ 并转为 WebP）、Jupyter Notebook（.ipynb，抽取图表与富文本），以及独立 PDF 文档（.pdf）。PDF 作为文章发布时，页面内嵌交互阅读器与专属下载卡片，<strong>不放入全站资料库</strong>。</p>
         
         <div class="form-group">
           <label class="form-label">笔记绝对路径</label>
@@ -1400,9 +1615,101 @@ HTML_PAGE = """<!DOCTYPE html>
       <div class="modal-footer">
         <div id="modal-meta" style="font-size:0.85rem; color:var(--text-muted);"></div>
         <div style="display:flex; gap:8px;">
+          <button class="btn btn-sm btn-primary" id="modal-edit-btn" onclick="editFromModal()">✏️ 编辑此作品</button>
           <a class="btn btn-sm" id="modal-orig-link" href="" target="_blank">🔍 查看高清原图</a>
           <button class="btn btn-sm btn-danger" id="modal-del-btn" onclick="deleteFromModal()">🗑️ 移出相册</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 文章/日记 快速编辑 Modal -->
+  <div class="modal-overlay" id="edit-article-modal" onclick="closeArticleEditModal(event)">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 id="edit-article-modal-title">✏️ 快捷编辑文章 / 日记</h3>
+        <button class="btn btn-sm" onclick="closeArticleEditModalDirect()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-article-original-slug">
+        <div class="form-group">
+          <label class="form-label">标题</label>
+          <input type="text" id="edit-article-title" class="form-input" placeholder="文章或日记标题">
+        </div>
+        <div class="form-group">
+          <label class="form-label">标识 / Slug (生成网址路径)</label>
+          <input type="text" id="edit-article-slug" class="form-input" placeholder="如：tsukihime-game（建议小写英文、数字与短横线）">
+          <div class="form-hint">🔗 将决定文章访问网址（如 <code>/posts/标识名/</code> 或 <code>/diary/标识名/</code>）。修改后系统会自动写入重定向别名，旧外链不失效。</div>
+        </div>
+        <div class="form-group" id="edit-article-cat-group">
+          <label class="form-label">分类 (Categories)</label>
+          <input type="text" id="edit-article-categories" class="form-input" placeholder="如：型月, 随笔（多个分类用逗号分隔）">
+        </div>
+        <div class="form-group">
+          <label class="form-label">标签 (Tags)</label>
+          <input type="text" id="edit-article-tags" class="form-input" placeholder="如：Fate, 魔法使之夜（多个标签用逗号分隔）">
+          <div class="form-hint">💡 多个标签以中英文逗号隔开即可。</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">文章摘要 / 描述</label>
+          <textarea id="edit-article-summary" class="form-input" rows="3" style="resize: vertical;" placeholder="简介或卡片摘要"></textarea>
+        </div>
+        <div class="modal-notice-box">
+          <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+            <input type="checkbox" id="edit-article-update-lastmod" style="margin-top: 3px; accent-color: var(--primary);">
+            <div>
+              <div class="modal-notice-title">同时将文末“最后更新时间”刷新为当前时间</div>
+              <div class="modal-notice-desc">
+                默认未勾选：如果仅仅只是修改标签、分类或标题，文末更新时间<strong>绝不改变</strong>。只有在正文实质更新时才建议勾选。
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
+        <button class="btn" onclick="closeArticleEditModalDirect()">取消</button>
+        <button class="btn btn-primary" id="save-article-btn" onclick="submitEditArticle()">💾 保存更改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 相册图片 快捷编辑 Modal -->
+  <div class="modal-overlay" id="edit-gallery-modal" onclick="closeGalleryEditModal(event)">
+    <div class="modal-content" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3>✏️ 编辑相册作品信息</h3>
+        <button class="btn btn-sm" onclick="closeGalleryEditModalDirect()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-gallery-image">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <img id="edit-gallery-preview" src="" style="max-height: 180px; max-width: 100%; border-radius: 8px; border: 1px solid var(--border); object-fit: contain; background: var(--card-subtle);">
+        </div>
+        <div class="form-group">
+          <label class="form-label">作品配文 / 描述</label>
+          <input type="text" id="edit-gallery-caption" class="form-input" placeholder="如：苍崎青子 & 久远寺有珠">
+        </div>
+        <div class="form-group">
+          <label class="form-label">所属相册分类</label>
+          <select id="edit-gallery-category" class="form-input">
+            <option value="anime">🎨 动漫收藏 (Anime)</option>
+            <option value="photography">📷 摄影之光 (Photography)</option>
+            <option value="daily">☕ 生活切片 (Daily)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">拍摄/记录日期 (Date)</label>
+          <input type="date" id="edit-gallery-date" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">标签 (Tags)</label>
+          <input type="text" id="edit-gallery-tags" class="form-input" placeholder="如：魔法使之夜, 苍崎青子（逗号分隔）">
+          <div class="form-hint">💡 多个标签以逗号隔开。</div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
+        <button class="btn" onclick="closeGalleryEditModalDirect()">取消</button>
+        <button class="btn btn-primary" id="save-gallery-btn" onclick="submitEditGallery()">💾 保存更改</button>
       </div>
     </div>
   </div>
@@ -1786,15 +2093,34 @@ HTML_PAGE = """<!DOCTYPE html>
     }
     function setGitMsg(msg) { document.getElementById('git-msg').value = msg; }
 
+    /* 本地 Hugo 1314 浏览器直连探针（双重保障） */
+    async function pingHugoLocal() {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 1200);
+        await fetch('http://localhost:1314/', { mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+        clearTimeout(timer);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
     /* Hugo 状态 */
     async function checkHugoStatus() {
       try {
-        const res = await fetch('/api/hugo-status');
-        const data = await res.json();
+        const [apiRunning, directRunning] = await Promise.all([
+          fetch('/api/hugo-status?_t=' + Date.now(), { cache: 'no-store' })
+            .then(r => r.json())
+            .then(d => !!d.running)
+            .catch(() => false),
+          pingHugoLocal()
+        ]);
+        const isRunning = apiRunning || directRunning;
         const badge = document.getElementById('hugo-status-badge');
         const text = document.getElementById('hugo-status-text');
         const toggleBtn = document.getElementById('hugo-toggle-btn');
-        if (data.running) {
+        if (isRunning) {
           badge.className = 'status-badge';
           text.textContent = 'Hugo 服务运行中 (1314)';
           toggleBtn.textContent = '⏹️ 停止服务';
@@ -1805,9 +2131,25 @@ HTML_PAGE = """<!DOCTYPE html>
           toggleBtn.textContent = '▶️ 启动 Hugo';
           toggleBtn.className = 'btn btn-sm';
         }
-      } catch (e) {}
+      } catch (e) {
+        const directRunning = await pingHugoLocal();
+        const badge = document.getElementById('hugo-status-badge');
+        const text = document.getElementById('hugo-status-text');
+        const toggleBtn = document.getElementById('hugo-toggle-btn');
+        if (directRunning) {
+          badge.className = 'status-badge';
+          text.textContent = 'Hugo 服务运行中 (1314)';
+          toggleBtn.textContent = '⏹️ 停止服务';
+          toggleBtn.className = 'btn btn-sm btn-danger';
+        } else {
+          badge.className = 'status-badge stopped';
+          text.textContent = 'Hugo 未运行';
+          toggleBtn.textContent = '▶️ 启动 Hugo';
+          toggleBtn.className = 'btn btn-sm';
+        }
+      }
     }
-    setInterval(checkHugoStatus, 5000);
+    setInterval(checkHugoStatus, 4000);
     checkHugoStatus();
 
     async function toggleHugo() {
@@ -1815,13 +2157,17 @@ HTML_PAGE = """<!DOCTYPE html>
       toggleBtn.disabled = true;
       toggleBtn.textContent = '⏳ 处理中...';
       try {
-        await fetch('/api/toggle-hugo', { method: 'POST' });
-        setTimeout(async () => {
-          await checkHugoStatus();
-          toggleBtn.disabled = false;
-        }, 800);
+        const res = await fetch('/api/toggle-hugo', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+        } else {
+          showToast(data.message || '操作失败', 'error');
+        }
       } catch (e) {
-        showToast('操作失败：' + e.message, 'error');
+        showToast('操作异常：' + e.message, 'error');
+      } finally {
+        await checkHugoStatus();
         toggleBtn.disabled = false;
       }
     }
@@ -1928,8 +2274,10 @@ HTML_PAGE = """<!DOCTYPE html>
                 <span>比例: ${item.ratio}</span>
                 <span>${item.category === 'anime' ? '🎨 动漫' : (item.category === 'photography' ? '📷 摄影' : '☕ 日常')}</span>
               </div>
+              ${item.tags && item.tags.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">${item.tags.map(t => `<span class="badge" style="font-size:0.72rem;padding:1px 5px;">#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
             </div>
             <div class="gallery-card-actions" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-primary" onclick="openGalleryEditModal('${escapeJs(item.image)}')">✏️ 编辑</button>
               <a class="btn btn-sm" href="${item.image}" target="_blank">🔍 原图</a>
               <button class="btn btn-sm btn-danger" onclick="confirmDeleteGallery('${item.image}', '${escapeHtml(item.caption)}')">🗑️ 移除</button>
             </div>
@@ -1954,6 +2302,13 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('gallery-modal').classList.add('is-active');
     }
 
+    function editFromModal() {
+      if (!curModalItem) return;
+      const img = curModalItem.image;
+      closeModalDirect();
+      openGalleryEditModal(img);
+    }
+
     function closeModal(e) {
       if (e.target.id === 'gallery-modal') {
         closeModalDirect();
@@ -1966,6 +2321,69 @@ HTML_PAGE = """<!DOCTYPE html>
       if (!curModalItem) return;
       closeModalDirect();
       confirmDeleteGallery(curModalItem.image, curModalItem.caption);
+    }
+
+    /* 相册快捷编辑 */
+    function openGalleryEditModal(imageUrl) {
+      const item = allGallery.find(g => g.image === imageUrl);
+      if (!item) {
+        showToast('未找到该图片数据', 'error');
+        return;
+      }
+      document.getElementById('edit-gallery-image').value = item.image;
+      document.getElementById('edit-gallery-preview').src = item.image;
+      document.getElementById('edit-gallery-caption').value = item.caption || '';
+      document.getElementById('edit-gallery-category').value = item.category || 'anime';
+      document.getElementById('edit-gallery-date').value = item.date || '';
+      document.getElementById('edit-gallery-tags').value = (item.tags || []).join(', ');
+      document.getElementById('edit-gallery-modal').classList.add('is-active');
+    }
+
+    function closeGalleryEditModal(e) {
+      if (e.target.id === 'edit-gallery-modal') closeGalleryEditModalDirect();
+    }
+    function closeGalleryEditModalDirect() {
+      document.getElementById('edit-gallery-modal').classList.remove('is-active');
+    }
+
+    async function submitEditGallery() {
+      const image = document.getElementById('edit-gallery-image').value;
+      const caption = document.getElementById('edit-gallery-caption').value.trim();
+      const category = document.getElementById('edit-gallery-category').value;
+      const dateVal = document.getElementById('edit-gallery-date').value.trim();
+      const tagsStr = document.getElementById('edit-gallery-tags').value.trim();
+      const tags = tagsStr ? tagsStr.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
+
+      const btn = document.getElementById('save-gallery-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ 保存中...';
+
+      try {
+        const res = await fetch('/api/gallery/edit', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            image: image,
+            caption: caption,
+            category: category,
+            date: dateVal,
+            tags: tags
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          closeGalleryEditModalDirect();
+          await loadGallery();
+        } else {
+          showToast('保存失败: ' + data.message, 'error');
+        }
+      } catch (e) {
+        showToast('请求异常: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 保存更改';
+      }
     }
 
     async function doAddGallery() {
@@ -2093,21 +2511,106 @@ HTML_PAGE = """<!DOCTYPE html>
         <tr>
           <td><span class="badge ${item.type === 'post' ? 'badge-post' : 'badge-diary'}">${item.type_label}</span></td>
           <td><span class="badge ${item.draft ? 'badge-draft' : 'badge-active'}">${item.draft ? '🟡 已下架' : '🟢 正常'}</span></td>
-          <td><small style="color:var(--text-muted);">${item.date}</small></td>
+          <td>
+            <small style="color:var(--text-muted);">${item.date}</small>
+            ${item.lastmod ? `<div style="font-size:0.72rem;color:var(--primary);margin-top:2px;" title="文末更新时间">🕒 ${item.lastmod.slice(0, 16).replace('T', ' ')}</div>` : ''}
+          </td>
           <td>
             <strong>${escapeHtml(item.title)}</strong>
+            ${item.tags && item.tags.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;">${item.tags.map(t => `<span class="badge" style="font-size:0.73rem;padding:1px 6px;">#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
           </td>
           <td><code style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(item.slug)}</code></td>
           <td>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               <a class="btn btn-sm" href="http://localhost:1314${item.url}" target="_blank" title="在新标签页预览">👁️ 预览</a>
-              <button class="btn btn-sm" onclick="openInLocalEditor('${escapeJs(item.path)}')">✏️ 编辑</button>
+              <button class="btn btn-sm btn-primary" onclick="openArticleEditModal('${escapeJs(item.slug)}')">✏️ 快捷编辑</button>
+              <button class="btn btn-sm" onclick="openInLocalEditor('${escapeJs(item.path)}')">📂 本地打开</button>
               <button class="btn btn-sm" onclick="toggleDraft('${item.slug}', ${!item.draft})">${item.draft ? '🟢 上架' : '🟡 下架'}</button>
               <button class="btn btn-sm btn-danger" onclick="confirmDelete('${item.slug}', '${escapeHtml(item.title)}')">🗑️ 删除</button>
             </div>
           </td>
         </tr>
       `).join('');
+    }
+
+    /* 文章/日记 快捷编辑 */
+    function openArticleEditModal(slug) {
+      const item = allArticles.find(a => a.slug === slug);
+      if (!item) {
+        showToast('未找到该文章数据', 'error');
+        return;
+      }
+      document.getElementById('edit-article-original-slug').value = item.slug;
+      document.getElementById('edit-article-slug').value = item.slug;
+      document.getElementById('edit-article-title').value = item.title || '';
+      document.getElementById('edit-article-tags').value = (item.tags || []).join(', ');
+
+      const catInput = document.getElementById('edit-article-categories');
+      if (item.type === 'diary') {
+        catInput.placeholder = '如：生活手记, 读书札记, 折腾记录（逗号分隔）';
+        catInput.value = (item.categories || []).join(', ');
+      } else {
+        catInput.placeholder = '如：型月, 随笔（多个分类用逗号分隔）';
+        catInput.value = (item.categories || []).join(', ');
+      }
+      document.getElementById('edit-article-cat-group').style.display = 'block';
+
+      document.getElementById('edit-article-summary').value = item.summary || '';
+      document.getElementById('edit-article-update-lastmod').checked = false;
+      document.getElementById('edit-article-modal-title').textContent = `✏️ 快捷编辑：${item.type_label}「${item.title || item.slug}」`;
+      document.getElementById('edit-article-modal').classList.add('is-active');
+    }
+
+    function closeArticleEditModal(e) {
+      if (e.target.id === 'edit-article-modal') closeArticleEditModalDirect();
+    }
+    function closeArticleEditModalDirect() {
+      document.getElementById('edit-article-modal').classList.remove('is-active');
+    }
+
+    async function submitEditArticle() {
+      const originalSlug = document.getElementById('edit-article-original-slug').value;
+      const newSlug = document.getElementById('edit-article-slug').value.trim();
+      const title = document.getElementById('edit-article-title').value.trim();
+      const tagsStr = document.getElementById('edit-article-tags').value.trim();
+      const tags = tagsStr ? tagsStr.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
+      const catsStr = document.getElementById('edit-article-categories').value.trim();
+      const categories = catsStr ? catsStr.split(/[,，]/).map(c => c.trim()).filter(Boolean) : [];
+      const summary = document.getElementById('edit-article-summary').value.trim();
+      const updateLastmod = document.getElementById('edit-article-update-lastmod').checked;
+
+      const btn = document.getElementById('save-article-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ 保存中...';
+
+      try {
+        const res = await fetch('/api/article/edit', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            slug: originalSlug,
+            new_slug: newSlug,
+            title: title,
+            tags: tags,
+            categories: categories,
+            summary: summary,
+            update_lastmod: updateLastmod
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          closeArticleEditModalDirect();
+          await loadArticles();
+        } else {
+          showToast('保存失败: ' + data.message, 'error');
+        }
+      } catch (e) {
+        showToast('请求异常: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 保存更改';
+      }
     }
 
     function filterArticles() {
@@ -2220,7 +2723,7 @@ HTML_PAGE = """<!DOCTYPE html>
       btn.disabled = true;
       btn.textContent = '⏳ 正在拉取远程更新...';
       log.style.display = 'block';
-      log.textContent = '正在执行 git pull --rebase origin main...\n';
+      log.textContent = '正在执行 git pull --rebase origin main...\\n';
 
       try {
         const res = await fetch('/api/git-pull', { method: 'POST' });
@@ -2268,7 +2771,7 @@ HTML_PAGE = """<!DOCTYPE html>
     }
     function escapeJs(str) {
       if (!str) return '';
-      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      return JSON.stringify(String(str)).slice(1, -1);
     }
 
     // 支持拖拽文件直接识别填充路径
@@ -2340,8 +2843,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if url.path == '/':
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             self.end_headers()
-            self.wfile.write(HTML_PAGE.encode('utf-8'))
+
+            running = is_hugo_running()
+            badge_class = 'status-badge' if running else 'status-badge stopped'
+            status_text = 'Hugo 服务运行中 (1314)' if running else 'Hugo 未运行'
+            btn_class = 'btn btn-sm btn-danger' if running else 'btn btn-sm'
+            btn_text = '⏹️ 停止服务' if running else '▶️ 启动 Hugo'
+
+            try:
+                articles_count = len(get_all_articles())
+            except Exception:
+                articles_count = 0
+            try:
+                gallery_count = len(get_gallery_images())
+            except Exception:
+                gallery_count = 0
+            try:
+                resources_count = len(parse_resources_yaml())
+            except Exception:
+                resources_count = 0
+
+            html = HTML_PAGE \
+                .replace('__HUGO_BADGE_CLASS__', badge_class) \
+                .replace('__HUGO_STATUS_TEXT__', status_text) \
+                .replace('__HUGO_BTN_CLASS__', btn_class) \
+                .replace('__HUGO_BTN_TEXT__', btn_text) \
+                .replace('__ARTICLES_COUNT__', str(articles_count)) \
+                .replace('__GALLERY_COUNT__', str(gallery_count)) \
+                .replace('__RESOURCES_COUNT__', str(resources_count))
+
+            self.wfile.write(html.encode('utf-8'))
         elif url.path.startswith('/images/'):
             local_path = (BLOG_ROOT / 'static' / url.path.lstrip('/')).resolve()
             if local_path.exists() and local_path.is_file():
@@ -2373,7 +2906,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             notes = scan_recent_notes()
             self.send_json(notes)
         elif url.path == '/api/hugo-status':
-            running = is_port_in_use(1314)
+            running = is_hugo_running()
             self.send_json({'running': running})
         elif url.path == '/api/git-status':
             status = get_git_status()
@@ -2526,6 +3059,41 @@ class DashboardHandler(BaseHTTPRequestHandler):
             ok, msg = delete_gallery_image(img_url)
             self.send_json({'success': ok, 'message': msg})
 
+        elif url.path == '/api/gallery/edit':
+            img_url = payload.get('image', '').strip()
+            caption = payload.get('caption', '').strip() or None
+            category = payload.get('category', '').strip() or None
+            date_val = payload.get('date', '').strip() or None
+            tags_raw = payload.get('tags', '')
+            if isinstance(tags_raw, list):
+                tags = [str(t).strip() for t in tags_raw if str(t).strip()]
+            else:
+                tags = [t.strip() for t in str(tags_raw).split(',') if t.strip()]
+            ok, msg = update_gallery_image(img_url, new_caption=caption, new_category=category, new_tags=tags, new_date=date_val)
+            self.send_json({'success': ok, 'message': msg})
+
+        elif url.path == '/api/article/edit':
+            slug = payload.get('slug', '').strip()
+            new_slug = payload.get('new_slug', '').strip() or None
+            title = payload.get('title', '').strip() or None
+            tags_raw = payload.get('tags', '')
+            if isinstance(tags_raw, list):
+                tags = [str(t).strip() for t in tags_raw if str(t).strip()]
+            else:
+                tags = [t.strip() for t in str(tags_raw).split(',') if t.strip()]
+            cat_raw = payload.get('categories', payload.get('category', ''))
+            if isinstance(cat_raw, list):
+                cats = [str(c).strip() for c in cat_raw if str(c).strip()]
+            elif cat_raw:
+                cats = [c.strip() for c in str(cat_raw).split(',') if c.strip()]
+            else:
+                cats = None
+            summary = payload.get('summary', '').strip() or None
+            update_lastmod = bool(payload.get('update_lastmod', False))
+
+            ok, msg = edit_article_meta(slug, new_slug=new_slug, title=title, tags=tags, categories=cats, summary=summary, update_lastmod=update_lastmod)
+            self.send_json({'success': ok, 'message': msg})
+
         elif url.path == '/api/open-file':
             target_path = payload.get('path', '').strip()
             ok, msg = open_local_path(target_path)
@@ -2576,23 +3144,40 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 full_output.append(res.stderr)
             success = (res.returncode == 0)
             self.send_json({'success': success, 'output': '\n'.join(full_output)})
+        elif url.path == '/api/toggle-hugo':
+            if is_hugo_running():
+                ok, msg = stop_hugo_server()
+            else:
+                ok, msg = start_hugo_server()
+            self.send_json({'success': ok, 'message': msg, 'running': is_hugo_running()})
         else:
             self.send_error(404, "API Not Found")
 
     def send_json(self, data):
         self.send_response(200)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
 
 def run_server():
+    atexit.register(stop_hugo_server)
+
+    # 自动伴随启动 Hugo 本地预览服务 (1314)，实现完全去终端化的一键体验
+    if not is_hugo_running():
+        print("⚡ 正在伴随启动 Hugo 本地实时预览服务 (1314)...")
+        start_hugo_server()
+
     port = get_available_port(PORT)
     server = ThreadingHTTPServer(('127.0.0.1', port), DashboardHandler)
     url = f"http://localhost:{port}"
     print(f"\n=======================================================")
-    print(f"✨ 有珠之夜 · 博客管理控制台 4.0 Pro 已启动！")
-    print(f"🌐 访问地址：{url}")
-    print(f"💡 浏览器已自动打开。按 Ctrl + C 可关闭控制台。")
+    print(f"✨ 有珠之夜 · 博客管理控制台 4.0 Pro 已就绪！")
+    print(f"🌐 可视化管理台：{url}")
+    print(f"📖 本地实时预览：http://localhost:1314/")
+    print(f"💡 浏览器已自动打开控制台，双击即可无缝管理与预览。")
     print(f"=======================================================\n")
     try:
         webbrowser.open(url)
@@ -2600,9 +3185,16 @@ def run_server():
         pass
     try:
         server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n👋 控制台已安全退出。")
-        server.server_close()
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    finally:
+        print("\n👋 正在安全停止控制台与预览服务...")
+        stop_hugo_server()
+        try:
+            server.server_close()
+        except Exception:
+            pass
+        print("👋 已安全退出。")
 
 if __name__ == '__main__':
     run_server()

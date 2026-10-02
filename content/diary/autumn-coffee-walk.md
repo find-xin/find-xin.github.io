@@ -9,6 +9,7 @@ mood: '🍂 秋日'
 weather: '晴'
 pinned: true
 tags: ['日常', '散步', '随笔']
+diary_categories: ['生活手记']
 likes: 28
 ---
 

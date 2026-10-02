@@ -100,7 +100,9 @@
   let currentIndex = 0;
 
   const getVisibleLinks = () => {
-    return Array.from(document.querySelectorAll('.album-section:not(.is-hidden) .album-card:not([style*="display: none"]) .gallery-open'));
+    const albumLinks = Array.from(document.querySelectorAll('.album-section:not(.is-hidden) .album-card:not([style*="display: none"]) .gallery-open'));
+    if (albumLinks.length) return albumLinks;
+    return Array.from(document.querySelectorAll('.home-gallery-card.gallery-open, .gallery-open'));
   };
 
   const showLightboxImage = (index) => {
@@ -112,9 +114,14 @@
     lbImage.alt = link.dataset.caption;
     if (lbCaption) lbCaption.textContent = link.dataset.caption;
     if (lbCategory) lbCategory.textContent = link.dataset.category || '';
-    if (lbTags) lbTags.textContent = link.dataset.tags ? `标签: ${link.dataset.tags}` : '';
+    if (lbTags) {
+      const parts = [];
+      if (link.dataset.date) parts.push(`📅 ${link.dataset.date}`);
+      if (link.dataset.tags) parts.push(`🏷️ ${link.dataset.tags}`);
+      lbTags.textContent = parts.join('   ');
+    }
     if (lbCount) lbCount.textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(currentVisibleLinks.length).padStart(2, '0')}`;
-    if (lbOriginal) lbOriginal.href = link.href;
+    if (lbOriginal) lbOriginal.href = link.dataset.original || link.dataset.image || link.href;
   };
 
   document.addEventListener('click', (e) => {

@@ -940,6 +940,45 @@ body.dark-mode .archive-tab.active { background: #ffffff; color: #141416; border
 .archive-post:hover .archive-post-cover img { transform: scale(1.05); }
 .archive-meta a:not(.tag) { color: var(--accent-color); }
 
+.archive-cat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--primary-color) !important;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: 99px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.archive-cat-badge:hover {
+  background: rgba(0, 0, 0, 0.09);
+  color: var(--accent-color) !important;
+}
+.archive-cat-diary {
+  color: #ff2442 !important;
+  background: rgba(255, 36, 66, 0.08);
+}
+.archive-cat-diary:hover {
+  background: rgba(255, 36, 66, 0.15);
+}
+body.dark-mode .archive-cat-badge {
+  background: rgba(255, 255, 255, 0.08);
+}
+body.dark-mode .archive-cat-diary {
+  color: #ff526b !important;
+  background: rgba(255, 82, 107, 0.16);
+}
+.archive-mood-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--secondary-color);
+  opacity: 0.85;
+}
+
 .page-content { margin-inline: auto; max-width: none; }
 /* Capsule Tags System */
 .tag, .article-tags .tag, .post-tags .tag, .archive-tags .tag, .archive-meta .tag {
@@ -1880,6 +1919,30 @@ body.dark-mode .album-card-info {
 }
 body.dark-mode .album-card-num {
   background: rgba(255, 107, 107, 0.18);
+}
+
+.album-card-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.album-card-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4.5px;
+  font-size: 11.5px;
+  font-family: var(--font-monospace, monospace);
+  color: var(--secondary-color);
+  opacity: 0.72;
+  letter-spacing: -0.2px;
+  line-height: 1;
+}
+
+.album-date-icon {
+  opacity: 0.65;
+  flex-shrink: 0;
 }
 
 .album-card-tags {
@@ -2884,7 +2947,7 @@ body.dark-mode .footer-bottom {
   .author-card--full-image .social-link { width: 40px; height: 40px; border-radius: 50%; color: var(--text-color); background: var(--card-background-color); border: 1px solid var(--border-color); display: inline-flex; align-items: center; justify-content: center; }
   .author-card-section { padding-top: 88px; }
   .term-grid { grid-template-columns: 1fr; }
-  .album-page, .gallery-page, .friends-page, .guestbook-page { padding-top: 96px; }
+  .album-page, .gallery-page, .friends-page, .guestbook-page, .resources-page { padding-top: 96px; }
   .album-nav-tabs { width: 100%; justify-content: space-between; gap: 4px; }
   .album-tab-btn { padding: 6px 12px; font-size: 12.5px; }
   .album-grid, .gallery-grid { columns: 1; }
@@ -4003,15 +4066,76 @@ body.dark-mode .pdf-reader-toolbar {
   height: auto !important;
 }
 
+/* PDF Download Card */
+.pdf-download-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin: 24px 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+.pdf-download-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pdf-download-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.pdf-download-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-color, #1e293b);
+  word-break: break-all;
+}
+.pdf-download-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+  margin-top: 3px;
+}
+.pdf-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  background: var(--accent-color, #f43f5e);
+  color: #ffffff !important;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 2px 6px rgba(244, 63, 94, 0.25);
+}
+.pdf-download-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+body.dark .pdf-download-card {
+  background: #18191d;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+body.dark .pdf-download-name {
+  color: #f1f5f9;
+}
+
 /* ==========================================================================
-   RESOURCES LIBRARY PAGE
+   RESOURCES LIBRARY PAGE (资料库系统 - 全站视觉体系与相册/日记对齐)
    ========================================================================== */
 .resources-page {
-  padding-top: 2rem;
-  padding-bottom: 5rem;
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding: 110px var(--content-padding) 70px;
 }
 .resources-header {
-  margin-bottom: 2.5rem;
+  margin-bottom: 24px;
 }
 .resources-header-top {
   display: flex;
@@ -4025,22 +4149,28 @@ body.dark-mode .pdf-reader-toolbar {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: var(--accent-color);
-  margin-bottom: 6px;
   text-transform: uppercase;
+  color: var(--accent-color);
+  margin: 0 0 6px;
 }
 .resources-title {
-  font-size: 2.2rem;
+  font-size: clamp(2rem, 3.5vw, 2.6rem);
+  font-family: var(--font-secondary);
   font-weight: 700;
-  color: var(--primary-color);
+  line-height: 1.2;
   margin: 0 0 6px 0;
+  color: var(--primary-color);
 }
 .resources-desc {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--secondary-color);
   margin: 0;
+  line-height: 1.6;
 }
 .resources-stats-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 14px;
   border-radius: 99px;
   background: var(--card-background-color);
@@ -4416,7 +4546,31 @@ body.dark-mode .res-tag-chip {
   transform: translateX(-50%) translateY(0);
 }
 
+/* Post Lastmod Notice (经典极简文字风格，统一靠右对齐) */
+.post-updated-notice {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin: 20px 0 16px;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--secondary-color, #6b7280);
+  opacity: 0.75;
+  background: none;
+  border: none;
+  box-shadow: none;
+  line-height: 1.5;
+  text-align: right;
+}
+.post-updated-notice svg {
+  color: var(--secondary-color, #6b7280);
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+

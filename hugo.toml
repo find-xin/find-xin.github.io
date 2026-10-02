@@ -20,6 +20,7 @@ title = 'find-xin 的博客'
 [taxonomies]
   tag = 'tags'
   category = 'categories'
+  diary_category = 'diary_categories'
 
 [outputs]
   home = ["HTML", "RSS", "JSON"]

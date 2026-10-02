@@ -12,7 +12,7 @@
   <header class="post-header">
     {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
     {{ if and $coverUrl (not .Params.hideCover) }}<figure class="post-cover"><img src="{{ $coverUrl }}" alt="{{ $.Title }}配图" fetchpriority="high"></figure>{{ end }}
-    <div class="post-meta">{{ range first 1 (.GetTerms "categories") }}<span class="post-category"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></span>{{ end }}<time class="post-date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time><span class="post-author">{{ site.Params.author }}</span>{{ if gt .WordCount 0 }}<span class="post-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟阅读</span>{{ end }}</div>
+    <div class="post-meta">{{ range first 1 (.GetTerms "categories") }}<span class="post-category"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></span>{{ end }}<time class="post-date" datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ .Date.Format "2006-01-02 15:04" }}</time><span class="post-author">{{ site.Params.author }}</span>{{ if gt .WordCount 0 }}<span class="post-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟阅读</span>{{ end }}</div>
     <h1 class="post-title">{{ .Title }}</h1>
     {{ with .GetTerms "tags" }}<div class="post-tags">{{ range . }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}
   </header>
@@ -51,6 +51,10 @@
       {{ end }}
     {{ end }}
     {{ .Content }}
+  </div>
+  <div class="post-updated-notice">
+    <svg class="post-updated-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    <span>最后更新于 {{ .Lastmod.Format "2006-01-02 15:04" }}</span>
   </div>
   <div class="post-signature-card">
     <div class="signature-avatar-wrap">

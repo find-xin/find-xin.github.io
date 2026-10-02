@@ -8,6 +8,7 @@ coverRatio: '1/1'
 mood: '🌙 深夜'
 weather: '微凉'
 tags: ['开发', '日常', '型月']
+diary_categories: ['折腾记录']
 likes: 46
 ---
 

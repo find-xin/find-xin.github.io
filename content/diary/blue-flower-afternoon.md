@@ -8,6 +8,7 @@ coverRatio: '3/4'
 mood: '🌱 清爽'
 weather: '雨后初晴'
 tags: ['摄影', '日常']
+diary_categories: ['生活手记']
 likes: 33
 ---
 

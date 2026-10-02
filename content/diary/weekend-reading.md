@@ -8,6 +8,7 @@ coverRatio: '3/4'
 mood: '☕️ 惬意'
 weather: '阴天'
 tags: ['阅读', '随笔']
+diary_categories: ['读书札记']
 likes: 21
 ---
 

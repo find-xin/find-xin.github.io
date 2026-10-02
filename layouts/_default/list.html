@@ -1,12 +1,29 @@
 {{ define "main" }}
 <section class="archive-container{{ if eq .Section "search" }} search-page{{ end }}">
   <header class="archive-header">
-    <h1 class="archive-title">{{ if or (eq .Title "Posts") (eq .Section "posts") }}文章归档{{ else if eq .Title "Tags" }}所有标签{{ else if eq .Title "Categories" }}文章分类{{ else }}{{ .Title }}{{ end }}</h1>
-    {{ if or (eq .Section "posts") (eq .Section "categories") (eq .Section "tags") (eq .Kind "taxonomy") (eq .Kind "term") }}
+    <h1 class="archive-title">
+      {{- if eq .Kind "term" -}}
+        {{- if eq .Data.Singular "category" -}}文章分类 · {{ .Title }}
+        {{- else if eq .Data.Singular "diary_category" -}}日记分类 · {{ .Title }}
+        {{- else if eq .Data.Singular "tag" -}}标签 · #{{ .Title }}
+        {{- else -}}{{ .Title }}
+        {{- end -}}
+      {{- else if or (eq .Title "Posts") (eq .Section "posts") -}}文章归档
+      {{- else if or (eq .Title "日记归档") (eq .Section "diary-archive") -}}日记归档
+      {{- else if or (eq .Title "Categories") (eq .Section "categories") -}}文章分类
+      {{- else if or (eq .Title "Diary_categories") (eq .Section "diary_categories") -}}日记分类
+      {{- else if or (eq .Title "Tags") (eq .Section "tags") -}}所有标签
+      {{- else -}}{{ .Title }}
+      {{- end -}}
+    </h1>
+    {{ $isArchiveContext := or (eq .Section "posts") (eq .Section "diary-archive") (eq .Section "categories") (eq .Section "diary_categories") (eq .Section "tags") (eq .Kind "taxonomy") (eq .Kind "term") }}
+    {{ if $isArchiveContext }}
     <nav class="archive-tabs" aria-label="归档维度">
-      <a class="archive-tab{{ if and (eq .Section "posts") (ne .Kind "term") }} active{{ end }}" href="{{ "posts/" | relURL }}">时间轴 ({{ len (where site.RegularPages "Section" "posts") }})</a>
-      <a class="archive-tab{{ if eq .Section "categories" }} active{{ end }}" href="{{ "categories/" | relURL }}">分类 ({{ len site.Taxonomies.categories }})</a>
-      <a class="archive-tab{{ if eq .Section "tags" }} active{{ end }}" href="{{ "tags/" | relURL }}">标签 ({{ len site.Taxonomies.tags }})</a>
+      <a class="archive-tab{{ if and (eq .Section "posts") (ne .Kind "term") }} active{{ end }}" href="{{ "posts/" | relURL }}">文章归档 ({{ len (where site.RegularPages "Section" "posts") }})</a>
+      <a class="archive-tab{{ if and (eq .Section "diary-archive") (ne .Kind "term") }} active{{ end }}" href="{{ "diary-archive/" | relURL }}">日记归档 ({{ len (where site.RegularPages "Section" "diary") }})</a>
+      <a class="archive-tab{{ if or (and (eq .Section "categories") (ne .Kind "term")) (eq .Data.Singular "category") }} active{{ end }}" href="{{ "categories/" | relURL }}">文章分类 ({{ len site.Taxonomies.categories }})</a>
+      <a class="archive-tab{{ if or (and (eq .Section "diary_categories") (ne .Kind "term")) (eq .Data.Singular "diary_category") }} active{{ end }}" href="{{ "diary_categories/" | relURL }}">日记分类 ({{ len (index site.Taxonomies "diary_categories") }})</a>
+      <a class="archive-tab{{ if or (and (eq .Section "tags") (ne .Kind "term")) (eq .Data.Singular "tag") }} active{{ end }}" href="{{ "tags/" | relURL }}">标签 ({{ len site.Taxonomies.tags }})</a>
     </nav>
     {{ end }}
   </header>
@@ -29,9 +46,15 @@
     {{ $searchJS := resources.Get "js/search.js" | minify | fingerprint }}<script src="{{ $searchJS.RelPermalink }}" integrity="{{ $searchJS.Data.Integrity }}" defer></script>
   {{ else if eq .Kind "taxonomy" }}
     <div class="term-grid">{{ range .Data.Terms.Alphabetical }}<a class="term-card" href="{{ .Page.RelPermalink }}"><span>{{ .Page.Title }}</span><small>{{ .Count }} 篇</small></a>{{ end }}</div>
-  {{ else if or (eq .Section "posts") (eq .Kind "term") }}
+  {{ else if or (eq .Section "posts") (eq .Section "diary-archive") (eq .Kind "term") }}
+    {{ $timelinePages := .Pages }}
+    {{ if eq .Section "diary-archive" }}
+      {{ $timelinePages = (where site.RegularPages "Section" "diary") }}
+    {{ else if eq .Section "posts" }}
+      {{ $timelinePages = (where site.RegularPages "Section" "posts") }}
+    {{ end }}
     <div class="archive-timeline-wrapper">
-      {{ range .Pages.GroupByDate "2006" }}
+      {{ range $timelinePages.GroupByDate "2006" }}
         <div class="archive-year-group">
           <div class="archive-year">
             <span class="year-number">{{ .Key }}</span>
@@ -47,7 +70,15 @@
                 <article class="archive-post-card{{ if $coverUrl }} has-cover{{ end }}">
                   <div class="archive-post-copy">
                     <h2 class="archive-post-title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
-                    <div class="archive-meta">{{ range .GetTerms "categories" }}<a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}{{ range first 3 (.GetTerms "tags") }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>
+                    <div class="archive-meta">
+                      {{ if eq .Section "diary" }}
+                        {{ range (.GetTerms "diary_categories") }}<a class="archive-cat-badge archive-cat-diary" href="{{ .RelPermalink }}">📖 {{ .LinkTitle }}</a>{{ end }}
+                        {{ with .Params.mood }}<span class="archive-mood-badge">{{ . }}</span>{{ end }}
+                      {{ else }}
+                        {{ range .GetTerms "categories" }}<a class="archive-cat-badge" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}
+                      {{ end }}
+                      {{ range first 3 (.GetTerms "tags") }}<a class="tag" href="{{ .RelPermalink }}">#{{ .LinkTitle }}</a>{{ end }}
+                    </div>
                   </div>
                   {{ with $coverUrl }}<a class="archive-post-cover" href="{{ $post.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . }}" alt="" loading="lazy"></a>{{ end }}
                 </article>
