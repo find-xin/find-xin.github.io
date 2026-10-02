@@ -33,6 +33,7 @@ from __future__ import annotations
 import os
 import sys
 import re
+import json
 import shutil
 import argparse
 import subprocess
@@ -406,7 +407,9 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
             return f"![{label}]({rel_dest})"
         elif ext in DOC_EXTENSIONS:
             label = alt_text or clean_target_name
-            return f"[📄 查看文档 {label}]({rel_dest})"
+            if ext == '.pdf':
+                return f'{{{{< pdf src="{rel_dest}" title="{label}" >}}}}'
+            return f"[📄 查看或下载文档 {label}]({rel_dest})"
         else:
             return f"[{alt_text or clean_target_name}]({rel_dest})"
 
@@ -420,7 +423,7 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
 
     new_body = re.sub(r'\[\[(.*?)\]\]', replace_page_link, new_body)
 
-    # 5. 转换已有标准 Markdown 图片语法：![](attachments/xxx) 或 ![](./attachments/xxx)
+    # 5. 转换已有标准 Markdown 图片与文档语法：![](attachments/xxx) 或 ![](./attachments/xxx)
     def replace_std_markdown_link(match):
         nonlocal first_image_path
         alt = match.group(1)
@@ -443,7 +446,9 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
                 copied_files.add(final_file_name)
             
             rel_dest = f"attachments/{final_file_name}"
-            if not first_image_path:
+            if ext == '.pdf':
+                return f'{{{{< pdf src="{rel_dest}" title="{alt or Path(clean_target_name).stem}" >}}}}'
+            if not first_image_path and ext in IMAGE_EXTENSIONS:
                 first_image_path = rel_dest
             return f"![{alt}]({rel_dest})"
         return match.group(0)
@@ -699,9 +704,261 @@ def process_ipynb_notebook(ipynb_path: Path, note_type: str, custom_slug: str | 
     print("   git push origin main\n")
     return True
 
+RESOURCES_YAML = BLOG_ROOT / 'data' / 'resources.yaml'
+
+def parse_resources_yaml() -> list[dict]:
+    """解析 data/resources.yaml 获取资源列表"""
+    if not RESOURCES_YAML.exists():
+        return []
+    content = RESOURCES_YAML.read_text(encoding='utf-8')
+    items = []
+    blocks = re.split(r'\n(?=- id:)', content)
+    for b in blocks:
+        if '- id:' not in b:
+            continue
+        item = {}
+        for line in b.strip().splitlines():
+            line = line.strip()
+            if line.startswith('- id:'):
+                item['id'] = line.split('- id:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('title:'):
+                item['title'] = line.split('title:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('filename:'):
+                item['filename'] = line.split('filename:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('url:'):
+                item['url'] = line.split('url:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('category:'):
+                item['category'] = line.split('category:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('format:'):
+                item['format'] = line.split('format:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('size:'):
+                item['size'] = line.split('size:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('file_count:'):
+                try: item['file_count'] = int(line.split('file_count:', 1)[1].strip())
+                except: item['file_count'] = 1
+            elif line.startswith('date:'):
+                item['date'] = line.split('date:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('description:'):
+                item['description'] = line.split('description:', 1)[1].strip().strip('\"\'')
+            elif line.startswith('tags:'):
+                raw = line.split('tags:', 1)[1].strip().strip('[]')
+                item['tags'] = [t.strip().strip('\"\'') for t in raw.split(',') if t.strip()]
+        if 'id' in item and 'filename' in item:
+            items.append(item)
+    return items
+
+def save_resources_yaml(items: list[dict]):
+    """持久化保存资源列表至 data/resources.yaml"""
+    lines = [
+        "# ==============================================================================",
+        "# 资料库资源列表 (Resources Data)",
+        "# ==============================================================================",
+        ""
+    ]
+    for it in items:
+        tags_str = json.dumps(it.get('tags', []), ensure_ascii=False)
+        desc_clean = it.get('description', '').replace('"', '\\"')
+        title_clean = it.get('title', '').replace('"', '\\"')
+        lines.append(f'- id: "{it.get("id")}"')
+        lines.append(f'  title: "{title_clean}"')
+        lines.append(f'  filename: "{it.get("filename")}"')
+        lines.append(f'  url: "{it.get("url")}"')
+        lines.append(f'  category: "{it.get("category", "docs")}"')
+        lines.append(f'  format: "{it.get("format", "bin")}"')
+        lines.append(f'  size: "{it.get("size", "0 B")}"')
+        lines.append(f'  file_count: {it.get("file_count", 1)}')
+        lines.append(f'  date: "{it.get("date", datetime.now().strftime("%Y-%m-%d"))}"')
+        lines.append(f'  description: "{desc_clean}"')
+        lines.append(f'  tags: {tags_str}')
+        lines.append('')
+    RESOURCES_YAML.write_text("\n".join(lines), encoding='utf-8')
+
+def add_resource_file(file_path: Path, category: str = "docs", title: str = "", description: str = "", tags: list[str] = None) -> tuple[bool, str, dict]:
+    """上传并添加单个文件（PDF、文档、源码、工具包等）到资料库"""
+    if not file_path.exists() or not file_path.is_file():
+        return False, f"找不到文件：{file_path}", {}
+
+    base_name = file_path.name
+    ext = file_path.suffix.lower().lstrip('.')
+    title = title or file_path.stem
+    tags = tags or (["文档资料"] if ext == 'pdf' else ["资源下载"])
+    category = category or ("docs" if ext == 'pdf' else "tools")
+
+    dest_dir = BLOG_ROOT / 'static' / 'resources'
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = sanitize_filename(base_name)
+    dest_file = dest_dir / safe_name
+    shutil.copy2(file_path, dest_file)
+
+    file_size = dest_file.stat().st_size
+    size_mb = round(file_size / (1024 * 1024), 2)
+    size_str = f"{size_mb} MB" if size_mb >= 1.0 else f"{round(file_size / 1024, 1)} KB"
+
+    res_id = f"res-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    new_item = {
+        'id': res_id,
+        'title': title,
+        'filename': safe_name,
+        'url': f"/resources/{safe_name}",
+        'category': category,
+        'format': ext,
+        'size': size_str,
+        'file_count': 1,
+        'date': datetime.now().strftime("%Y-%m-%d"),
+        'description': description or f"上传的 {ext.upper()} 文件资料：《{title}》",
+        'tags': tags
+    }
+
+    items = parse_resources_yaml()
+    items.insert(0, new_item)
+    save_resources_yaml(items)
+    return True, f"文件上传成功！格式：.{ext}，大小：{size_str}", new_item
+
+def add_resource_folder(folder_path: Path, category: str = "archives", title: str = "", description: str = "", tags: list[str] = None) -> tuple[bool, str, dict]:
+    """将整个文件夹自动打包为 ZIP 压缩包并加入资料库"""
+    import zipfile
+    if not folder_path.exists() or not folder_path.is_dir():
+        return False, f"找不到目录：{folder_path}", {}
+
+    base_name = folder_path.name
+    title = title or base_name
+    slug = sanitize_slug(base_name)
+    tags = tags or ["文件夹合集", "压缩包"]
+    category = category or "archives"
+
+    dest_dir = BLOG_ROOT / 'static' / 'resources'
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    zip_filename = f"{slug}.zip"
+    zip_dest = dest_dir / zip_filename
+
+    total_files = 0
+    with zipfile.ZipFile(zip_dest, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(folder_path):
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for f in files:
+                if f.startswith('.'):
+                    continue
+                fp = Path(root) / f
+                rel = fp.relative_to(folder_path)
+                zf.write(fp, str(rel))
+                total_files += 1
+
+    zip_size = zip_dest.stat().st_size
+    size_mb = round(zip_size / (1024 * 1024), 2)
+    size_str = f"{size_mb} MB" if size_mb >= 1.0 else f"{round(zip_size / 1024, 1)} KB"
+
+    res_id = f"res-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    new_item = {
+        'id': res_id,
+        'title': title,
+        'filename': zip_filename,
+        'url': f"/resources/{zip_filename}",
+        'category': category,
+        'format': 'zip',
+        'size': size_str,
+        'file_count': total_files,
+        'date': datetime.now().strftime("%Y-%m-%d"),
+        'description': description or f"文件夹「{base_name}」自动打包，共包含 {total_files} 个文件。",
+        'tags': tags
+    }
+
+    items = parse_resources_yaml()
+    items.insert(0, new_item)
+    save_resources_yaml(items)
+    return True, f"文件夹打包上传成功！共 {total_files} 个文件，压缩包大小：{size_str}", new_item
+
+def delete_resource(res_id: str) -> tuple[bool, str]:
+    """从资料库中移除指定资源及物理文件"""
+    items = parse_resources_yaml()
+    target = None
+    new_items = []
+    for it in items:
+        if it.get('id') == res_id:
+            target = it
+        else:
+            new_items.append(it)
+    if not target:
+        return False, f"未找到 ID 为 {res_id} 的资源"
+
+    save_resources_yaml(new_items)
+    filename = target.get('filename')
+    if filename:
+        p = BLOG_ROOT / 'static' / 'resources' / filename
+        if p.exists() and p.is_file():
+            try:
+                p.unlink()
+            except Exception:
+                pass
+    return True, f"已成功删除资源「{target.get('title')}」"
+
+def process_pdf_note(pdf_path: Path, note_type: str = 'post', custom_slug: str | None = None, tags: list[str] = None, category: str | None = None, draft: bool = False, description: str = "") -> bool:
+    """将 PDF 文档直接发布为带有内嵌交互阅读器的博客文章或日记"""
+    if not pdf_path.exists():
+        print(f"❌ 找不到 PDF 文件：{pdf_path}")
+        return False
+
+    base_name = pdf_path.stem
+    slug = custom_slug or sanitize_slug(base_name)
+    title = base_name.replace('-', ' ').replace('_', ' ').strip()
+    tags = tags or ["文档", "PDF"]
+    category = category or ("技术文档" if note_type == 'post' else "日常归档")
+
+    if note_type == 'diary':
+        target_dir = BLOG_ROOT / 'content' / 'diary' / slug
+    else:
+        target_dir = BLOG_ROOT / 'content' / 'posts' / slug
+
+    target_attachments_dir = target_dir / 'attachments'
+    target_attachments_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_name = sanitize_filename(pdf_path.name)
+    target_pdf = target_attachments_dir / safe_name
+    shutil.copy2(pdf_path, target_pdf)
+
+    # 同时复制一份到 static/resources 供外链直接下载
+    static_res_dir = BLOG_ROOT / 'static' / 'resources'
+    static_res_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(pdf_path, static_res_dir / safe_name)
+
+    size_mb = round(pdf_path.stat().st_size / (1024 * 1024), 2)
+    size_str = f"{size_mb} MB" if size_mb >= 1.0 else f"{round(pdf_path.stat().st_size / 1024, 1)} KB"
+
+    fm_lines = [
+        "---",
+        f"title: '{title}'",
+        f"date: {datetime.now().strftime('%Y-%m-%dT%H:%M:%S+08:00')}",
+        f"draft: {'true' if draft else 'false'}",
+        f"tags: {json.dumps(tags, ensure_ascii=False)}",
+        f"categories: [{json.dumps(category, ensure_ascii=False)}]",
+        f"pdf: 'attachments/{safe_name}'",
+        "hideCover: true",
+        f"description: '{description or f'PDF 文档笔记：《{title}》（文件大小：{size_str}）'}'",
+        "---",
+        "",
+        f'{{{{< pdf src="attachments/{safe_name}" title="{title}" height="800px" >}}}}',
+        "",
+        "> [!info] 📄 文档阅读与下载说明",
+        f"> - 本篇笔记为独立 PDF 格式文档，大小约 **{size_str}**。",
+        "> - 支持在上方内置阅读器中直接预览，点击右上角可开启 **全屏阅读** 或直接 **下载原始文件** 离线阅读。",
+        ""
+    ]
+    if description:
+        fm_lines.extend([
+            "### 📝 笔记摘要",
+            "",
+            description,
+            ""
+        ])
+
+    index_md = target_dir / "index.md"
+    index_md.write_text("\n".join(fm_lines), encoding='utf-8')
+    print(f"✨ 成功生成 PDF 笔记页面：{index_md}")
+    print(f"   文章路径：/posts/{slug}/")
+    return True
+
 def main():
-    parser = argparse.ArgumentParser(description="一键管理与发布 Markdown (.md) 与 Jupyter Notebook (.ipynb) 到 Hugo 博客")
-    parser.add_argument("file", nargs="?", help="笔记文件路径（支持 .md 或 .ipynb）")
+    parser = argparse.ArgumentParser(description="一键管理与发布 Markdown (.md)、Jupyter Notebook (.ipynb) 与 PDF (.pdf) 到 Hugo 博客")
+    parser.add_argument("file", nargs="?", help="笔记文件路径（支持 .md, .ipynb 或 .pdf）")
     parser.add_argument("--type", choices=['post', 'diary'], default='post', help="发布类型：post（博文长文）或 diary（微光日记，默认 post）")
     parser.add_argument("--slug", help="指定的英文文件夹别名（若不指定则自动根据标题生成）")
     parser.add_argument("--category", help="博文分类，例如 '技术'、'机器学习'")
@@ -740,6 +997,15 @@ def main():
     if file_path.suffix.lower() == '.ipynb':
         process_ipynb_notebook(
             ipynb_path=file_path,
+            note_type=args.type,
+            custom_slug=args.slug,
+            tags=tags_list,
+            category=args.category,
+            draft=args.draft
+        )
+    elif file_path.suffix.lower() == '.pdf':
+        process_pdf_note(
+            pdf_path=file_path,
             note_type=args.type,
             custom_slug=args.slug,
             tags=tags_list,

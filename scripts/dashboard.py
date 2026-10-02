@@ -25,7 +25,7 @@ import socket
 import re
 import time
 from pathlib import Path
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 CURRENT_DIR = Path(__file__).resolve().parent
 BLOG_ROOT = CURRENT_DIR.parent
@@ -36,7 +36,12 @@ from publish_obsidian import (
     set_draft_status,
     delete_article,
     process_obsidian_note,
-    process_ipynb_notebook
+    process_ipynb_notebook,
+    process_pdf_note,
+    parse_resources_yaml,
+    add_resource_file,
+    add_resource_folder,
+    delete_resource
 )
 
 PORT = 2026
@@ -52,7 +57,9 @@ MIME_TYPES = {
     '.css': 'text/css',
     '.js': 'application/javascript',
     '.json': 'application/json',
-    '.html': 'text/html; charset=utf-8'
+    '.html': 'text/html; charset=utf-8',
+    '.pdf': 'application/pdf',
+    '.zip': 'application/zip',
 }
 
 def is_port_in_use(port: int) -> bool:
@@ -96,11 +103,13 @@ def stop_hugo_server():
         pass
     return True, "已停止 Hugo 服务"
 
-def pick_file_macos(prompt="选择文件", file_types='{"md", "ipynb", "markdown"}', is_folder=False) -> str:
+def pick_file_macos(prompt="选择文件", file_types='{"md", "ipynb", "pdf", "markdown"}', is_folder=False) -> str:
     """调用 macOS 系统级原生文件或目录选择框"""
     try:
         if is_folder:
             cmd = f'choose folder with prompt "{prompt}"'
+        elif not file_types:
+            cmd = f'choose file with prompt "{prompt}"'
         else:
             cmd = f'choose file of type {file_types} with prompt "{prompt}"'
         script = f'''
@@ -378,19 +387,21 @@ def create_site_backup() -> tuple[bool, str]:
 RECENT_NOTES_CACHE = {'timestamp': 0, 'data': []}
 
 def scan_recent_notes(vault_dir_str: str = ""):
-    """探测扫描近期修改的 Markdown 或 Notebook（带10秒内存缓存）"""
+    """探测扫描近期修改的 Markdown、Notebook 或 PDF（带30秒极速内存缓存）"""
     global RECENT_NOTES_CACHE
     now = time.time()
-    if not vault_dir_str and now - RECENT_NOTES_CACHE['timestamp'] < 10 and RECENT_NOTES_CACHE['data']:
+    if not vault_dir_str and now - RECENT_NOTES_CACHE['timestamp'] < 30 and RECENT_NOTES_CACHE['data']:
         return RECENT_NOTES_CACHE['data']
 
     search_dirs = []
     if vault_dir_str.strip():
         search_dirs.append(Path(vault_dir_str).expanduser())
+    home = Path.home()
     search_dirs.extend([
-        Path.home() / 'Desktop' / 'Notes',
-        Path.home() / 'Desktop',
-        Path.home() / 'Documents'
+        home / 'Desktop' / 'Notes',
+        home / 'Documents' / 'Obsidian',
+        home / 'Desktop',
+        home / 'Downloads',
     ])
     
     seen = set()
@@ -400,16 +411,17 @@ def scan_recent_notes(vault_dir_str: str = ""):
             continue
         try:
             for root, dirs, files in os.walk(sdir):
-                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('node_modules', 'Library', '.git', 'site-packages', 'venv', 'youshu-night')]
                 rel_parts = Path(root).relative_to(sdir).parts
-                if len(rel_parts) > 4:
+                if len(rel_parts) > 2:
                     continue
                 for f in files:
                     if f.startswith('.'):
                         continue
-                    if f.endswith('.md') or f.endswith('.ipynb'):
+                    low_f = f.lower()
+                    if low_f.endswith('.md') or low_f.endswith('.ipynb') or low_f.endswith('.pdf'):
                         p = Path(root) / f
-                        if p not in seen and not any(part in p.parts for part in ['node_modules', '.git', 'site-packages', 'youshu-night']):
+                        if p not in seen:
                             seen.add(p)
                             try:
                                 found.append((p.stat().st_mtime, p))
@@ -917,6 +929,18 @@ HTML_PAGE = """<!DOCTYPE html>
       gap: 10px;
       margin-bottom: 16px;
     }
+    .res-fmt-tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--card-subtle);
+      border: 1px solid var(--border);
+      letter-spacing: 0.05em;
+    }
+    .res-fmt--pdf { background: rgba(239, 68, 68, 0.12); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+    .res-fmt--zip, .res-fmt--tar, .res-fmt--gz { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
   </style>
 </head>
 <body>
@@ -938,18 +962,22 @@ HTML_PAGE = """<!DOCTYPE html>
 
   <main class="container">
     <nav class="nav-tabs">
-      <button class="tab-btn active" onclick="switchTab('publish')">
+      <button class="tab-btn active" id="tab-btn-publish" onclick="switchTab('publish')">
         <span>✍️ 发布文章 / 笔记</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('gallery')">
+      <button class="tab-btn" id="tab-btn-resources" onclick="switchTab('resources')">
+        <span>📦 资料库与附件管理</span>
+        <span class="tab-counter" id="resources-counter">--</span>
+      </button>
+      <button class="tab-btn" id="tab-btn-gallery" onclick="switchTab('gallery')">
         <span>🖼️ 光影相册管理</span>
         <span class="tab-counter" id="gallery-counter">--</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('manage')">
+      <button class="tab-btn" id="tab-btn-manage" onclick="switchTab('manage')">
         <span>📚 全站文章管理</span>
         <span class="tab-counter" id="articles-counter">--</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('deploy')">
+      <button class="tab-btn" id="tab-btn-deploy" onclick="switchTab('deploy')">
         <span>🚀 部署到 GitHub</span>
       </button>
     </nav>
@@ -960,9 +988,9 @@ HTML_PAGE = """<!DOCTYPE html>
     <section id="tab-publish">
       <div class="card">
         <h2 class="card-title">
-          <span><span class="step-badge">1</span> 选择笔记或 Notebook 文件</span>
+          <span><span class="step-badge">1</span> 选择笔记、Notebook 或 PDF 文件</span>
         </h2>
-        <p class="card-desc">支持 Obsidian Markdown 笔记（自动抽取 attachments/ 并转为 WebP）或 Jupyter Notebook（.ipynb，自动抽取代码与图表）。</p>
+        <p class="card-desc">支持 Obsidian Markdown 笔记（自动抽取 attachments/ 并转为 WebP）、Jupyter Notebook（.ipynb，自动抽取代码与图表）以及 PDF 笔记（.pdf，自动生成内嵌交互阅读文章）。</p>
         
         <div class="form-group">
           <label class="form-label">笔记绝对路径</label>
@@ -1033,6 +1061,133 @@ HTML_PAGE = """<!DOCTYPE html>
         </div>
 
         <div id="publish-log" class="terminal-box"></div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB: 📦 资料库与附件管理 -->
+    <!-- ========================================== -->
+    <section id="tab-resources" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">
+          <span>📦 上传与打包资料到资料库</span>
+        </h2>
+        <p class="card-desc">支持上传独立文件（PDF、文档、电子书、安装包、源码）或将包含各类文件的整个文件夹一键打包为 ZIP 供访客下载。在资料库中不展示冗长正文，直接提供一键下载与直链。</p>
+
+        <div class="subtab-buttons">
+          <button type="button" class="btn btn-sm btn-primary" id="res-mode-file-btn" onclick="switchResourceMode('file')">📄 单个文件上传 (PDF/文档/压缩包/软件)</button>
+          <button type="button" class="btn btn-sm" id="res-mode-folder-btn" onclick="switchResourceMode('folder')">📁 文件夹一键打包为 ZIP (合集包)</button>
+        </div>
+
+        <!-- 单文件模式 -->
+        <div id="res-mode-file">
+          <div class="form-group">
+            <label class="form-label">选择文件路径</label>
+            <div class="input-with-button">
+              <input type="text" id="res-file-path" class="form-input" placeholder="选择或拖拽任意文件（PDF、ZIP、DOCX、EPUB 等）...">
+              <button type="button" class="btn btn-primary" onclick="pickResourceFile()">📂 浏览电脑文件...</button>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">资料标题 / 显示名称</label>
+              <input type="text" id="res-file-title" class="form-input" placeholder="例如：TypeScript 进阶实战手册（留空则默认使用文件名）">
+            </div>
+            <div class="form-group">
+              <label class="form-label">所属分类</label>
+              <select id="res-file-cat" class="form-select">
+                <option value="docs">📕 文档资料 (docs - PDF/电子书/指南)</option>
+                <option value="archives">🗜️ 压缩合集 (archives - 压缩包/文件集)</option>
+                <option value="code">💻 源码项目 (code - 源代码/项目包)</option>
+                <option value="tools">🛠️ 实用工具 (tools - 工具/脚本/配置)</option>
+                <option value="assets">🎨 素材资源 (assets - 图片/壁纸/模板)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">标签（逗号分隔）</label>
+            <input type="text" id="res-file-tags" class="form-input" placeholder="例如：TypeScript,前端,手册">
+          </div>
+          <div class="form-group">
+            <label class="form-label">简要描述 / 备注说明</label>
+            <textarea id="res-file-desc" class="form-input" rows="2" placeholder="简要说明这份资料的主要内容或用途..."></textarea>
+          </div>
+          <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+            <input type="checkbox" id="res-file-make-post" style="width:18px;height:18px;cursor:pointer;">
+            <label for="res-file-make-post" style="cursor:pointer;font-size:0.92rem;font-weight:500;">如果是 PDF 文件，同时在博客中生成内嵌交互阅读文章（自动发布至 /posts/）</label>
+          </div>
+          <div style="margin-top: 18px;">
+            <button type="button" class="btn btn-primary" id="res-file-submit-btn" onclick="doUploadResourceFile()" style="padding:10px 24px;">🚀 上传并收录至资料库</button>
+          </div>
+        </div>
+
+        <!-- 文件夹打包模式 -->
+        <div id="res-mode-folder" style="display: none;">
+          <div class="form-group">
+            <label class="form-label">选择本地文件夹</label>
+            <div class="input-with-button">
+              <input type="text" id="res-folder-path" class="form-input" placeholder="选择需要打包的文件夹路径...">
+              <button type="button" class="btn btn-primary" onclick="pickResourceFolder()">📁 浏览文件夹...</button>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">合集包标题 / 显示名称</label>
+              <input type="text" id="res-folder-title" class="form-input" placeholder="例如：开发环境配置文件包（留空默认文件夹名）">
+            </div>
+            <div class="form-group">
+              <label class="form-label">所属分类</label>
+              <select id="res-folder-cat" class="form-select">
+                <option value="archives">🗜️ 压缩合集 (archives - 压缩包/文件集)</option>
+                <option value="code">💻 源码项目 (code - 源代码/项目包)</option>
+                <option value="docs">📕 文档资料 (docs - 讲义/文档包)</option>
+                <option value="tools">🛠️ 实用工具 (tools - 工具/脚本/配置)</option>
+                <option value="assets">🎨 素材资源 (assets - 素材/图片包)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">标签（逗号分隔）</label>
+            <input type="text" id="res-folder-tags" class="form-input" value="文件夹合集,压缩包" placeholder="例如：合集,源码,打包">
+          </div>
+          <div class="form-group">
+            <label class="form-label">简要描述 / 备注说明</label>
+            <textarea id="res-folder-desc" class="form-input" rows="2" placeholder="简要说明此文件夹内包含哪些文件或用途..."></textarea>
+          </div>
+          <div style="margin-top: 18px;">
+            <button type="button" class="btn btn-primary" id="res-folder-submit-btn" onclick="doUploadResourceFolder()" style="padding:10px 24px;">🗜️ 自动压缩打包为 ZIP 并收录</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 资料库文件列表 -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <h2 class="card-title" style="margin:0;">
+            <span>📚 资料库已收录资源 (<span id="res-list-count">0</span>)</span>
+          </h2>
+          <div style="display:flex;gap:8px;">
+            <input type="search" id="res-search-input" class="form-input" placeholder="快速筛选资料..." style="width:220px;padding:6px 12px;" oninput="filterResourcesList()">
+            <button class="btn btn-sm" onclick="loadResources()">🔄 刷新列表</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">
+                <th style="padding: 10px 12px;">类型</th>
+                <th style="padding: 10px 12px;">标题 / 文件名</th>
+                <th style="padding: 10px 12px;">分类</th>
+                <th style="padding: 10px 12px;">大小 / 文件数</th>
+                <th style="padding: 10px 12px;">更新日期</th>
+                <th style="padding: 10px 12px; text-align: right;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="resources-table-body">
+              <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">正在加载资料库...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -1297,26 +1452,276 @@ HTML_PAGE = """<!DOCTYPE html>
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.getElementById('tab-publish').style.display = 'none';
+      document.getElementById('tab-resources').style.display = 'none';
       document.getElementById('tab-gallery').style.display = 'none';
       document.getElementById('tab-manage').style.display = 'none';
       document.getElementById('tab-deploy').style.display = 'none';
 
       if (tabId === 'publish') {
-        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('tab-btn-publish').classList.add('active');
         document.getElementById('tab-publish').style.display = 'block';
         loadRecentNotes();
+      } else if (tabId === 'resources') {
+        document.getElementById('tab-btn-resources').classList.add('active');
+        document.getElementById('tab-resources').style.display = 'block';
+        loadResources();
       } else if (tabId === 'gallery') {
-        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('tab-btn-gallery').classList.add('active');
         document.getElementById('tab-gallery').style.display = 'block';
         loadGallery();
       } else if (tabId === 'manage') {
-        document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        document.getElementById('tab-btn-manage').classList.add('active');
         document.getElementById('tab-manage').style.display = 'block';
         loadArticles();
       } else if (tabId === 'deploy') {
-        document.querySelectorAll('.tab-btn')[3].classList.add('active');
+        document.getElementById('tab-btn-deploy').classList.add('active');
         document.getElementById('tab-deploy').style.display = 'block';
         checkGitStatus();
+      }
+    }
+
+    /* 资料库管理 */
+    let allResources = [];
+
+    async function loadResources() {
+      try {
+        const res = await fetch('/api/resources');
+        allResources = await res.json();
+        const cntEl = document.getElementById('resources-counter');
+        const listCntEl = document.getElementById('res-list-count');
+        if (cntEl) cntEl.textContent = allResources.length;
+        if (listCntEl) listCntEl.textContent = allResources.length;
+        renderResourcesList(allResources);
+      } catch (e) {
+        document.getElementById('resources-table-body').innerHTML = `
+          <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--accent);">加载资料库失败：${escapeHtml(e.message)}</td></tr>
+        `;
+      }
+    }
+
+    function filterResourcesList() {
+      const q = (document.getElementById('res-search-input').value || '').trim().toLowerCase();
+      if (!q) {
+        renderResourcesList(allResources);
+        return;
+      }
+      const filtered = allResources.filter(r => 
+        (r.title || '').toLowerCase().includes(q) ||
+        (r.filename || '').toLowerCase().includes(q) ||
+        (r.description || '').toLowerCase().includes(q) ||
+        (r.category || '').toLowerCase().includes(q) ||
+        (r.format || '').toLowerCase().includes(q)
+      );
+      renderResourcesList(filtered);
+    }
+
+    function renderResourcesList(list) {
+      const tbody = document.getElementById('resources-table-body');
+      if (!list || list.length === 0) {
+        tbody.innerHTML = `
+          <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);">暂无匹配的资料记录</td></tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = list.map(item => {
+        const fmtBadge = `<span class="res-fmt-tag res-fmt--${escapeHtml(item.format)}">${escapeHtml((item.format || 'bin').toUpperCase())}</span>`;
+        const countStr = item.file_count > 1 ? ` · <span style="color:var(--primary);font-size:0.8rem;">📁 ${item.file_count} 文件</span>` : '';
+        const catMap = {
+          'docs': '📕 文档资料',
+          'archives': '🗜️ 压缩合集',
+          'code': '💻 源码项目',
+          'tools': '🛠️ 实用工具',
+          'assets': '🎨 素材模板'
+        };
+        const catName = catMap[item.category] || item.category || '未分类';
+
+        return `
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 12px;">${fmtBadge}</td>
+            <td style="padding: 12px;">
+              <div style="font-weight: 600; color: var(--text);">${escapeHtml(item.title)}</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); font-family: monospace;">${escapeHtml(item.filename)}</div>
+              ${item.description ? `<div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 3px;">${escapeHtml(item.description)}</div>` : ''}
+            </td>
+            <td style="padding: 12px; font-size: 0.85rem;">${catName}</td>
+            <td style="padding: 12px; font-family: monospace; font-size: 0.85rem;">${escapeHtml(item.size)}${countStr}</td>
+            <td style="padding: 12px; font-size: 0.82rem; color: var(--text-muted);">${escapeHtml(item.date)}</td>
+            <td style="padding: 12px; text-align: right; white-space: nowrap;">
+              <button class="btn btn-sm" onclick="openResourceInFinder('${escapeJs(item.filename)}')">📁 定位</button>
+              <button class="btn btn-sm" onclick="copyResourceUrl('${escapeJs(item.url)}')">🔗 直链</button>
+              <button class="btn btn-sm btn-danger" onclick="confirmDeleteResource('${escapeJs(item.id)}', '${escapeJs(item.title)}')">🗑️ 删除</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function switchResourceMode(mode) {
+      const fileBtn = document.getElementById('res-mode-file-btn');
+      const folderBtn = document.getElementById('res-mode-folder-btn');
+      const fileDiv = document.getElementById('res-mode-file');
+      const folderDiv = document.getElementById('res-mode-folder');
+      if (mode === 'file') {
+        fileBtn.className = 'btn btn-sm btn-primary';
+        folderBtn.className = 'btn btn-sm';
+        fileDiv.style.display = 'block';
+        folderDiv.style.display = 'none';
+      } else {
+        fileBtn.className = 'btn btn-sm';
+        folderBtn.className = 'btn btn-sm btn-primary';
+        fileDiv.style.display = 'none';
+        folderDiv.style.display = 'block';
+      }
+    }
+
+    async function pickResourceFile() {
+      try {
+        const res = await fetch('/api/pick-file?type=resource');
+        const data = await res.json();
+        if (data.path) {
+          document.getElementById('res-file-path').value = data.path;
+          const fname = data.path.split('/').pop();
+          if (!document.getElementById('res-file-title').value.trim()) {
+            document.getElementById('res-file-title').value = fname.replace(/\\.[^.]+$/, '');
+          }
+          showToast('已选取文件: ' + fname, 'success');
+        }
+      } catch (e) {
+        showToast('选择器调用失败: ' + e.message, 'error');
+      }
+    }
+
+    async function pickResourceFolder() {
+      try {
+        const res = await fetch('/api/pick-file?type=folder');
+        const data = await res.json();
+        if (data.path) {
+          document.getElementById('res-folder-path').value = data.path;
+          const folderName = data.path.split('/').filter(Boolean).pop();
+          if (!document.getElementById('res-folder-title').value.trim()) {
+            document.getElementById('res-folder-title').value = folderName;
+          }
+          showToast('已选取文件夹: ' + folderName, 'success');
+        }
+      } catch (e) {
+        showToast('选择器调用失败: ' + e.message, 'error');
+      }
+    }
+
+    async function doUploadResourceFile() {
+      const path = document.getElementById('res-file-path').value.trim();
+      if (!path) {
+        showToast('请先选择或拖拽需要上传的文件！', 'warning');
+        return;
+      }
+      const title = document.getElementById('res-file-title').value.trim();
+      const cat = document.getElementById('res-file-cat').value;
+      const tags = document.getElementById('res-file-tags').value.trim();
+      const desc = document.getElementById('res-file-desc').value.trim();
+      const makePost = document.getElementById('res-file-make-post').checked;
+
+      const btn = document.getElementById('res-file-submit-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ 正在上传收录...';
+      try {
+        const res = await fetch('/api/resource/add-file', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ path, title, category: cat, tags, description: desc, make_post: makePost })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message + (data.post_created ? ' 并已生成内嵌阅读博文！' : ''), 'success');
+          document.getElementById('res-file-path').value = '';
+          document.getElementById('res-file-title').value = '';
+          document.getElementById('res-file-desc').value = '';
+          loadResources();
+        } else {
+          showToast('上传失败: ' + data.message, 'error');
+        }
+      } catch (e) {
+        showToast('请求异常: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 上传并收录至资料库';
+      }
+    }
+
+    async function doUploadResourceFolder() {
+      const folder = document.getElementById('res-folder-path').value.trim();
+      if (!folder) {
+        showToast('请先选择需要打包的文件夹！', 'warning');
+        return;
+      }
+      const title = document.getElementById('res-folder-title').value.trim();
+      const cat = document.getElementById('res-folder-cat').value;
+      const tags = document.getElementById('res-folder-tags').value.trim();
+      const desc = document.getElementById('res-folder-desc').value.trim();
+
+      const btn = document.getElementById('res-folder-submit-btn');
+      btn.disabled = true;
+      btn.textContent = '🗜️ 正在压缩打包中...';
+      try {
+        const res = await fetch('/api/resource/add-folder', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ folder, title, category: cat, tags, description: desc })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          document.getElementById('res-folder-path').value = '';
+          document.getElementById('res-folder-title').value = '';
+          document.getElementById('res-folder-desc').value = '';
+          loadResources();
+        } else {
+          showToast('打包失败: ' + data.message, 'error');
+        }
+      } catch (e) {
+        showToast('请求异常: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🗜️ 自动压缩打包为 ZIP 并收录';
+      }
+    }
+
+    async function confirmDeleteResource(id, title) {
+      if (!confirm(`确定要从资料库中移除《${title}》及其本地文件吗？`)) return;
+      try {
+        const res = await fetch('/api/resource/delete', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('已成功移除资料', 'success');
+          loadResources();
+        } else {
+          showToast('删除失败: ' + data.message, 'error');
+        }
+      } catch (e) {
+        showToast('网络错误: ' + e.message, 'error');
+      }
+    }
+
+    function openResourceInFinder(filename) {
+      fetch('/api/open-file', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ path: 'static/resources/' + filename })
+      });
+    }
+
+    function copyResourceUrl(url) {
+      const fullUrl = window.location.origin + url;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(fullUrl).then(() => {
+          showToast('已复制下载直链到剪贴板！', 'success');
+        });
+      } else {
+        prompt('请复制链接：', fullUrl);
       }
     }
 
@@ -1876,9 +2281,14 @@ HTML_PAGE = """<!DOCTYPE html>
       e.stopPropagation();
       if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
       const file = e.dataTransfer.files[0];
+      const isResourcesTab = document.getElementById('tab-resources').style.display === 'block';
+      const targetInputId = isResourcesTab ? 'res-file-path' : 'file-path';
+
       if (file.path) {
-        document.getElementById('file-path').value = file.path;
-        switchTab('publish');
+        document.getElementById(targetInputId).value = file.path;
+        if (isResourcesTab && !document.getElementById('res-file-title').value.trim()) {
+          document.getElementById('res-file-title').value = file.name.replace(/\.[^.]+$/, '');
+        }
         showToast('已识别拖入文件: ' + file.name, 'success');
         return;
       }
@@ -1888,21 +2298,24 @@ HTML_PAGE = """<!DOCTYPE html>
           const res = await fetch('/api/find-file?name=' + encodeURIComponent(file.name));
           const data = await res.json();
           if (data.found) {
-            document.getElementById('file-path').value = data.found;
-            switchTab('publish');
+            document.getElementById(targetInputId).value = data.found;
+            if (isResourcesTab && !document.getElementById('res-file-title').value.trim()) {
+              document.getElementById('res-file-title').value = file.name.replace(/\.[^.]+$/, '');
+            }
             showToast('已定位文件路径: ' + data.found, 'success');
           } else {
-            showToast('已检测到文件名 ' + file.name + '，建议点击“选择文件”直接选取', 'warning');
-            document.getElementById('file-path').value = file.name;
+            showToast('已检测到文件名 ' + file.name + '，建议点击“浏览文件”直接选取', 'warning');
+            document.getElementById(targetInputId).value = file.name;
           }
         } catch (err) {
-          document.getElementById('file-path').value = file.name;
+          document.getElementById(targetInputId).value = file.name;
         }
       }
     });
 
     // 初始化加载
     loadRecentNotes();
+    loadResources();
   </script>
 </body>
 </html>
@@ -1935,6 +2348,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.serve_file(local_path)
             else:
                 self.send_error(404, "Image Not Found")
+        elif url.path.startswith('/resources/'):
+            local_path = (BLOG_ROOT / 'static' / url.path.lstrip('/')).resolve()
+            if local_path.exists() and local_path.is_file():
+                self.serve_file(local_path)
+            else:
+                self.send_error(404, "Resource Not Found")
         elif url.path.startswith('/posts/') or url.path.startswith('/diary/'):
             local_path = (BLOG_ROOT / 'content' / url.path.lstrip('/')).resolve()
             if local_path.exists() and local_path.is_file():
@@ -1946,6 +2365,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_json(articles)
         elif url.path == '/api/gallery':
             items = get_gallery_images()
+            self.send_json(items)
+        elif url.path == '/api/resources':
+            items = parse_resources_yaml()
             self.send_json(items)
         elif url.path == '/api/recent-notes':
             notes = scan_recent_notes()
@@ -1962,33 +2384,34 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if ftype == 'image':
                 selected = pick_file_macos("选择相册图片文件", '{"png", "jpg", "jpeg", "webp", "gif"}')
             elif ftype == 'folder':
-                selected = pick_file_macos("选择包含图片的文件夹", is_folder=True)
+                selected = pick_file_macos("选择文件夹", is_folder=True)
+            elif ftype == 'resource':
+                selected = pick_file_macos("选择上传到资料库的文件", file_types=None)
             else:
-                selected = pick_file_macos("选择笔记或Notebook文件", '{"md", "ipynb", "markdown"}')
+                selected = pick_file_macos("选择笔记、Notebook或PDF文件", '{"md", "ipynb", "pdf", "markdown"}')
             self.send_json({'path': selected})
         elif url.path == '/api/find-file':
             query = urllib.parse.parse_qs(url.query)
             fname = query.get('name', [''])[0].strip()
             found = ""
             if fname:
-                home = Path.home()
-                search_dirs = [
-                    home / 'Desktop',
-                    home / 'Documents',
-                    home / 'Downloads',
-                    BLOG_ROOT,
-                ]
-                for sdir in search_dirs:
-                    if sdir.exists():
-                        try:
-                            for p in sdir.rglob(fname):
-                                if not any(part.startswith('.') for part in p.parts):
-                                    found = str(p.resolve())
-                                    break
+                try:
+                    res = subprocess.run(['mdfind', '-name', fname], capture_output=True, text=True, timeout=1.5)
+                    lines = [l.strip() for l in res.stdout.splitlines() if l.strip()]
+                    clean_lines = [l for l in lines if not any(p.startswith('.') for p in Path(l).parts) and 'Trash' not in l]
+                    if clean_lines:
+                        found = clean_lines[0]
+                except Exception:
+                    pass
+                if not found:
+                    home = Path.home()
+                    for sdir in [home / 'Desktop', home / 'Downloads', BLOG_ROOT]:
+                        if sdir.exists():
+                            for p in sdir.glob(fname):
+                                found = str(p.resolve())
+                                break
                             if found:
                                 break
-                        except Exception:
-                            pass
             self.send_json({'found': found})
         else:
             self.send_error(404, "Not Found")
@@ -2027,11 +2450,51 @@ class DashboardHandler(BaseHTTPRequestHandler):
             with redirect_stdout(log_buffer), redirect_stderr(log_buffer):
                 if p.suffix.lower() == '.ipynb':
                     ok = process_ipynb_notebook(p, note_type, slug, tags, category, draft)
+                elif p.suffix.lower() == '.pdf':
+                    ok = process_pdf_note(p, note_type, slug, tags, category, draft)
                 else:
                     ok = process_obsidian_note(p, note_type, slug, tags, category, draft)
 
             output_text = log_buffer.getvalue()
             self.send_json({'success': ok, 'message': '发布完成' if ok else '发布失败', 'output': output_text})
+
+        elif url.path == '/api/resource/add-file':
+            fpath = payload.get('path', '').strip()
+            cat = payload.get('category', 'docs').strip()
+            title = payload.get('title', '').strip()
+            desc = payload.get('description', '').strip()
+            tags_raw = payload.get('tags', '').strip()
+            tags = [t.strip() for t in tags_raw.split(',') if t.strip()]
+            make_post = bool(payload.get('make_post', False))
+
+            p = Path(fpath).expanduser().resolve()
+            ok, msg, item = add_resource_file(p, cat, title, desc, tags)
+
+            post_created = False
+            if ok and make_post and p.suffix.lower() == '.pdf':
+                try:
+                    post_created = process_pdf_note(p, note_type='post', custom_slug=None, tags=tags, category="技术文档", draft=False, description=desc)
+                except Exception as e:
+                    msg += f"（生成博文时遇到提示：{e}）"
+
+            self.send_json({'success': ok, 'message': msg, 'post_created': post_created})
+
+        elif url.path == '/api/resource/add-folder':
+            folder = payload.get('folder', '').strip()
+            cat = payload.get('category', 'archives').strip()
+            title = payload.get('title', '').strip()
+            desc = payload.get('description', '').strip()
+            tags_raw = payload.get('tags', '').strip()
+            tags = [t.strip() for t in tags_raw.split(',') if t.strip()]
+
+            p = Path(folder).expanduser().resolve()
+            ok, msg, item = add_resource_folder(p, cat, title, desc, tags)
+            self.send_json({'success': ok, 'message': msg})
+
+        elif url.path == '/api/resource/delete':
+            res_id = payload.get('id', '').strip()
+            ok, msg = delete_resource(res_id)
+            self.send_json({'success': ok, 'message': msg})
 
         elif url.path == '/api/toggle-hugo':
             running = is_port_in_use(1314)
@@ -2124,10 +2587,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
 def run_server():
     port = get_available_port(PORT)
-    server = HTTPServer(('127.0.0.1', port), DashboardHandler)
+    server = ThreadingHTTPServer(('127.0.0.1', port), DashboardHandler)
     url = f"http://localhost:{port}"
     print(f"\n=======================================================")
-    print(f"✨ 有珠之夜 · 博客管理控制台 3.0 Ultimate 已启动！")
+    print(f"✨ 有珠之夜 · 博客管理控制台 4.0 Pro 已启动！")
     print(f"🌐 访问地址：{url}")
     print(f"💡 浏览器已自动打开。按 Ctrl + C 可关闭控制台。")
     print(f"=======================================================\n")

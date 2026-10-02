@@ -2,5 +2,6 @@
 <a class="nav-item{{ if eq .Section "diary" }} active{{ end }}" href="{{ "diary/" | relURL }}">日记</a>
 <a class="nav-item{{ if or (eq .Section "posts") (eq .Section "categories") (eq .Section "tags") }} active{{ end }}" href="{{ "posts/" | relURL }}">归档</a>
 <a class="nav-item{{ if eq .Section "gallery" }} active{{ end }}" href="{{ "gallery/" | relURL }}">相册</a>
+<a class="nav-item{{ if eq .Section "resources" }} active{{ end }}" href="{{ "resources/" | relURL }}">资料库</a>
 <a class="nav-item{{ if eq .Section "friends" }} active{{ end }}" href="{{ site.Params.friendsURL | relURL }}">友链</a>
 <a class="nav-item{{ if eq .Section "guestbook" }} active{{ end }}" href="{{ site.Params.guestbookURL | relURL }}">留言</a>

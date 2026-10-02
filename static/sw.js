@@ -58,10 +58,11 @@ self.addEventListener('fetch', (event) => {
 
   // Stale-While-Revalidate for static assets (CSS, JS, Images, Fonts)
   if (
-    url.pathname.match(/\.(css|js|webp|png|jpg|jpeg|svg|woff2?|ttf|ico|json)$/i) ||
+    url.pathname.match(/\.(css|js|webp|png|jpg|jpeg|svg|woff2?|ttf|ico|json|pdf)$/i) ||
     url.pathname.startsWith('/css/') ||
     url.pathname.startsWith('/js/') ||
-    url.pathname.startsWith('/images/')
+    url.pathname.startsWith('/images/') ||
+    url.pathname.startsWith('/resources/')
   ) {
     event.respondWith(
       caches.match(req).then((cached) => {

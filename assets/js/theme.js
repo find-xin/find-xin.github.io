@@ -920,4 +920,35 @@
       a.classList.add('external-link');
     }
   });
+
+  // 19. PDF Reader Fullscreen Control
+  window.togglePdfFullscreen = function(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      if (el.requestFullscreen) {
+        el.requestFullscreen();
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      } else if (el.msRequestFullscreen) {
+        el.msRequestFullscreen();
+      }
+      el.classList.add('is-fullscreen');
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+      el.classList.remove('is-fullscreen');
+    }
+  };
+
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+      document.querySelectorAll('.pdf-reader-container.is-fullscreen').forEach(el => {
+        el.classList.remove('is-fullscreen');
+      });
+    }
+  });
 })();
