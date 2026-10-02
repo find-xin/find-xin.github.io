@@ -542,10 +542,37 @@
     if (a && a.href) prefetchUrl(a.href);
   }, { passive: true });
 
-  // 14. Service Worker Registration (Offline Instant Loading & PWA Cache)
-  if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    });
-  }
+  // 15. Obsidian Callout Box Parser & Renderer
+  const calloutMap = {
+    'note': { icon: 'ℹ️', title: 'Note', class: 'callout-note' },
+    'info': { icon: 'ℹ️', title: 'Info', class: 'callout-note' },
+    'tip': { icon: '💡', title: 'Tip', class: 'callout-tip' },
+    'hint': { icon: '💡', title: 'Hint', class: 'callout-tip' },
+    'important': { icon: '❗', title: 'Important', class: 'callout-important' },
+    'warning': { icon: '⚠️', title: 'Warning', class: 'callout-warning' },
+    'caution': { icon: '🔥', title: 'Caution', class: 'callout-caution' },
+    'danger': { icon: '🛑', title: 'Danger', class: 'callout-danger' },
+    'quote': { icon: '💬', title: 'Quote', class: 'callout-quote' },
+    'example': { icon: '📝', title: 'Example', class: 'callout-example' }
+  };
+
+  document.querySelectorAll('.post-content blockquote, .diary-single-content blockquote').forEach(bq => {
+    const firstP = bq.querySelector('p');
+    if (!firstP) return;
+    const match = firstP.innerHTML.match(/^\s*\[!([a-zA-Z]+)\]\s*(.*?)(?:<br\s*\/?>|\n|$)/);
+    if (match) {
+      const type = match[1].toLowerCase();
+      const config = calloutMap[type] || { icon: '📌', title: match[1].toUpperCase(), class: 'callout-note' };
+      const customTitle = match[2].trim() || config.title;
+
+      firstP.innerHTML = firstP.innerHTML.replace(/^\s*\[!([a-zA-Z]+)\]\s*(.*?)(?:<br\s*\/?>|\n|$)/, '');
+      if (!firstP.innerHTML.trim()) firstP.remove();
+
+      bq.classList.add('obsidian-callout', config.class);
+      const header = document.createElement('div');
+      header.className = 'callout-header';
+      header.innerHTML = `<span class="callout-icon" aria-hidden="true">${config.icon}</span><span class="callout-title">${customTitle}</span>`;
+      bq.insertBefore(header, bq.firstChild);
+    }
+  });
 })();

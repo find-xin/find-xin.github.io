@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-dashboard.py - 博客桌面级可视化管理后台 (Web Dashboard 2.0)
-零外部依赖，开箱即用，双击直接启动。
-功能：
-1. ✍️ 发布工作台：支持 Obsidian 笔记 (.md 带附件) 与 Jupyter Notebook (.ipynb)，带 macOS 原生文件选择器与一键转换
-2. 🖼️ 光影相册管理：可视化管理多分区相册（摄影 / 日常 / 动漫），自动测量宽高比、转 WebP、编号并写入 gallery.yaml
-3. 📚 全站文章管理：实时检索、缩略图展示、一键下架/重新上架、安全删除
-4. 🚀 一键部署上线：Git 状态检测、预设提交说明、一键推送到 GitHub 并触发自动构建
-5. ⚡ Hugo 本地服务：顶栏一键启停 Hugo 本地预览服务 (端口 1314)
+dashboard.py - 博客桌面级可视化管理后台 (Web Dashboard 3.0 Ultimate)
+零外部依赖，纯原生运行，双击直接启动。
+新增与优化功能：
+1. ✍️ 发布工作台：macOS 原生文件选择器、近期笔记智能探测、Obsidian attachments 与 Jupyter .ipynb 一键转换
+2. 🖼️ 光影相册工作台：单图添加 + 📁 批量目录导入，自动计算物理长宽比、转码高质量 WebP、自动全局编号、写入 YAML
+3. 🔍 画廊交互式灯箱：在控制台内直接点击预览大图、查看图片比例与元数据
+4. 📚 全站文章管理：一键下架/重新上架、一键彻底清理、✏️ 一键在 Obsidian / 本地编辑器中打开
+5. 🚀 一键部署上线：实时 Git 变动检测、预设提交说明、终端流式日志与 GitHub 快捷导航
+6. 🍞 现代化 Toast 通知系统：告别阻塞弹窗，交互行云流水
+7. ⚡ Hugo 本地服务：顶栏一键启停 Hugo 本地预览服务 (端口 1314)
 """
 
 from __future__ import annotations
@@ -21,10 +23,10 @@ import subprocess
 import shutil
 import socket
 import re
+import time
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# 导入核心发布与管理模块
 CURRENT_DIR = Path(__file__).resolve().parent
 BLOG_ROOT = CURRENT_DIR.parent
 GALLERY_YAML = BLOG_ROOT / 'data' / 'gallery.yaml'
@@ -74,7 +76,6 @@ def start_hugo_server():
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
-        import time
         time.sleep(1)
         return True, "已启动 Hugo 本地预览服务"
     except Exception as e:
@@ -95,16 +96,20 @@ def stop_hugo_server():
         pass
     return True, "已停止 Hugo 服务"
 
-def pick_file_macos(prompt="选择文件", file_types='{"md", "ipynb", "markdown"}') -> str:
-    """调用 macOS 系统级原生文件选择框"""
+def pick_file_macos(prompt="选择文件", file_types='{"md", "ipynb", "markdown"}', is_folder=False) -> str:
+    """调用 macOS 系统级原生文件或目录选择框"""
     try:
+        if is_folder:
+            cmd = f'choose folder with prompt "{prompt}"'
+        else:
+            cmd = f'choose file of type {file_types} with prompt "{prompt}"'
         script = f'''
         try
             tell application "System Events"
                 activate
             end tell
-            set selectedFile to choose file of type {file_types} with prompt "{prompt}"
-            return POSIX path of selectedFile
+            set selectedItem to {cmd}
+            return POSIX path of selectedItem
         on error
             return ""
         end try
@@ -114,8 +119,21 @@ def pick_file_macos(prompt="选择文件", file_types='{"md", "ipynb", "markdown
     except Exception:
         return ""
 
+def open_local_path(target_path: str) -> tuple[bool, str]:
+    """在系统默认应用（如 Obsidian/VS Code/访达）中打开指定文件"""
+    p = Path(target_path).expanduser()
+    if not p.is_absolute():
+        p = (BLOG_ROOT / target_path).resolve()
+    if not p.exists():
+        return False, f"找不到文件: {p}"
+    try:
+        subprocess.run(['open', str(p)], check=True)
+        return True, f"已在系统默认应用中打开: {p.name}"
+    except Exception as e:
+        return False, f"打开失败: {e}"
+
 def get_image_info(img_path: Path):
-    """使用 macOS 内置的 sips 工具提取图片真实宽高与长宽比"""
+    """使用 macOS 内置的 sips 工具提取图片真实物理宽高与长宽比"""
     try:
         res = subprocess.run(
             ['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', str(img_path)],
@@ -264,6 +282,26 @@ def add_gallery_image(raw_path: str, category: str, caption: str, tags: list[str
 
     return True, f"成功加入相册！编号：{num_str}，文件：{rel_img_url}（长宽比：{ratio}）"
 
+def batch_add_gallery(folder_path: str, category: str, default_tags: list[str]) -> tuple[bool, str, int]:
+    """批量导入文件夹内的所有图片到指定相册分类"""
+    folder = Path(folder_path).expanduser().resolve()
+    if not folder.exists() or not folder.is_dir():
+        return False, f"找不到目标目录：{folder_path}", 0
+
+    valid_exts = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff'}
+    images = [f for f in sorted(folder.iterdir()) if f.is_file() and f.suffix.lower() in valid_exts]
+    if not images:
+        return False, f"目录中未找到任何图片文件（支持 PNG/JPG/WebP）", 0
+
+    success_count = 0
+    for img in images:
+        caption = img.stem.replace('-', ' ').replace('_', ' ').strip()
+        ok, _ = add_gallery_image(str(img), category, caption, default_tags)
+        if ok:
+            success_count += 1
+
+    return True, f"批量导入完成！共将 {success_count} / {len(images)} 幅作品加入相册。", success_count
+
 def delete_gallery_image(image_url: str) -> tuple[bool, str]:
     if not GALLERY_YAML.exists():
         return False, "找不到 data/gallery.yaml"
@@ -306,12 +344,67 @@ def get_git_status():
     except Exception as e:
         return {'clean': True, 'changed_count': 0, 'files': [], 'branch': 'main', 'error': str(e)}
 
+def scan_recent_notes(vault_dir_str: str = ""):
+    """探测扫描近期修改的 Markdown 或 Notebook"""
+    search_dirs = []
+    if vault_dir_str.strip():
+        search_dirs.append(Path(vault_dir_str).expanduser())
+    search_dirs.extend([
+        Path.home() / 'Desktop' / 'Notes',
+        Path.home() / 'Desktop',
+        Path.home() / 'Documents'
+    ])
+    
+    seen = set()
+    found = []
+    for sdir in search_dirs:
+        if not sdir.exists():
+            continue
+        try:
+            for root, dirs, files in os.walk(sdir):
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                rel_parts = Path(root).relative_to(sdir).parts
+                if len(rel_parts) > 4:
+                    continue
+                for f in files:
+                    if f.startswith('.'):
+                        continue
+                    if f.endswith('.md') or f.endswith('.ipynb'):
+                        p = Path(root) / f
+                        if p not in seen and not any(part in p.parts for part in ['node_modules', '.git', 'site-packages', 'youshu-night']):
+                            seen.add(p)
+                            try:
+                                found.append((p.stat().st_mtime, p))
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+
+    found.sort(key=lambda x: x[0], reverse=True)
+    now = time.time()
+    results = []
+    for mtime, p in found[:10]:
+        diff = now - mtime
+        if diff < 3600:
+            rel = f"{max(1, int(diff // 60))}分钟前"
+        elif diff < 86400:
+            rel = f"{int(diff // 3600)}小时前"
+        else:
+            rel = f"{int(diff // 86400)}天前"
+        results.append({
+            'name': p.name,
+            'path': str(p),
+            'rel_time': rel,
+            'ext': p.suffix.lower()
+        })
+    return results
+
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>有珠之夜 · 博客管理控制台</title>
+  <title>有珠之夜 · 博客管理控制台 3.0</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
   <style>
     :root {
@@ -365,7 +458,6 @@ HTML_PAGE = """<!DOCTYPE html>
       min-height: 100vh;
     }
     
-    /* 顶部导航条 */
     .header {
       background: var(--card-bg);
       border-bottom: 1px solid var(--border);
@@ -405,7 +497,6 @@ HTML_PAGE = """<!DOCTYPE html>
     
     .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     
-    /* 统一按钮设计 */
     .btn {
       display: inline-flex;
       align-items: center;
@@ -438,7 +529,6 @@ HTML_PAGE = """<!DOCTYPE html>
     .btn-sm { padding: 4px 10px; font-size: 0.82rem; border-radius: 6px; }
     .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-    /* 主容器与 Tab 切换 */
     .container { max-width: 1140px; margin: 24px auto; padding: 0 20px 48px; }
     
     .nav-tabs {
@@ -483,7 +573,6 @@ HTML_PAGE = """<!DOCTYPE html>
       border-radius: 99px;
     }
 
-    /* 模块卡片 */
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
@@ -508,7 +597,6 @@ HTML_PAGE = """<!DOCTYPE html>
       margin-bottom: 18px;
     }
     
-    /* 统计徽标卡 */
     .stats-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -527,7 +615,6 @@ HTML_PAGE = """<!DOCTYPE html>
     .stat-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
     .stat-val { font-size: 1.35rem; font-weight: 700; color: var(--text); }
 
-    /* 表单组件 */
     .form-group { margin-bottom: 18px; }
     .form-label {
       display: block;
@@ -564,7 +651,6 @@ HTML_PAGE = """<!DOCTYPE html>
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
     }
 
-    /* 快捷标签 Pills */
     .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .chip {
       padding: 3px 10px;
@@ -579,7 +665,6 @@ HTML_PAGE = """<!DOCTYPE html>
     }
     .chip:hover { border-color: var(--primary); color: var(--primary); }
 
-    /* 步进向导序号 */
     .step-badge {
       display: inline-flex;
       align-items: center;
@@ -594,7 +679,6 @@ HTML_PAGE = """<!DOCTYPE html>
       margin-right: 6px;
     }
 
-    /* 终端输出框 */
     .terminal-box {
       background: var(--code-bg);
       color: var(--code-text);
@@ -612,7 +696,6 @@ HTML_PAGE = """<!DOCTYPE html>
       display: none;
     }
 
-    /* 表格样式 */
     .table-responsive { width: 100%; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
     th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -628,11 +711,9 @@ HTML_PAGE = """<!DOCTYPE html>
     }
     .badge-post { background: var(--primary-soft); color: var(--primary); }
     .badge-diary { background: var(--warning-soft); color: var(--warning); }
-    .badge-anime { background: rgba(168, 85, 247, 0.12); color: #a855f7; }
     .badge-active { background: var(--success-soft); color: var(--success); }
     .badge-draft { background: var(--card-subtle); color: var(--text-muted); }
 
-    /* 相册网格图墙 */
     .gallery-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -648,6 +729,7 @@ HTML_PAGE = """<!DOCTYPE html>
       flex-direction: column;
       box-shadow: var(--shadow-sm);
       transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
     }
     .gallery-card:hover {
       transform: translateY(-2px);
@@ -732,6 +814,71 @@ HTML_PAGE = """<!DOCTYPE html>
       color: #fff;
       border-color: var(--primary);
     }
+
+    /* 画廊大图预览 Lightbox 模态框 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.is-active { display: flex; }
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      max-width: 900px;
+      width: 100%;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      overflow-y: auto;
+      background: #000;
+    }
+    .modal-img {
+      max-width: 100%;
+      max-height: 60vh;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+    }
+
+    /* 模式切换与选项卡 */
+    .subtab-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
@@ -758,7 +905,7 @@ HTML_PAGE = """<!DOCTYPE html>
       </button>
       <button class="tab-btn" onclick="switchTab('gallery')">
         <span>🖼️ 光影相册管理</span>
-        <span class="tab-counter" id="gallery-counter">43</span>
+        <span class="tab-counter" id="gallery-counter">--</span>
       </button>
       <button class="tab-btn" onclick="switchTab('manage')">
         <span>📚 全站文章管理</span>
@@ -777,15 +924,20 @@ HTML_PAGE = """<!DOCTYPE html>
         <h2 class="card-title">
           <span><span class="step-badge">1</span> 选择笔记或 Notebook 文件</span>
         </h2>
-        <p class="card-desc">支持 Obsidian Markdown 笔记（自动提取 attachments/ 并转为 WebP）或 Jupyter Notebook（.ipynb，自动抽取代码与图表）。</p>
+        <p class="card-desc">支持 Obsidian Markdown 笔记（自动抽取 attachments/ 并转为 WebP）或 Jupyter Notebook（.ipynb，自动抽取代码与图表）。</p>
         
         <div class="form-group">
           <label class="form-label">笔记绝对路径</label>
           <div class="input-with-button">
-            <input type="text" id="file-path" class="form-input" placeholder="点击右侧按钮选择文件，或粘贴绝对路径...">
+            <input type="text" id="file-path" class="form-input" placeholder="点击右侧按钮选择文件，或从下方快速填入...">
             <button class="btn btn-primary" onclick="pickFile('note')">📂 浏览电脑文件...</button>
           </div>
-          <p class="form-hint">💡 也可以在访达（Finder）中选中文件按 <code>Option + Command + C</code> 快速复制路径后直接粘贴。</p>
+          <div id="recent-notes-container" style="margin-top: 10px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">⚡ 近期笔记智能发现：</div>
+            <div class="chip-group" id="recent-notes-chips">
+              <span class="chip" style="color:var(--text-muted);">正在探测常用笔记库...</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -847,44 +999,80 @@ HTML_PAGE = """<!DOCTYPE html>
     </section>
 
     <!-- ========================================== -->
-    <!-- TAB 2: 🖼️ 光影相册管理 (NEW!) -->
+    <!-- TAB 2: 🖼️ 光影相册管理 -->
     <!-- ========================================== -->
     <section id="tab-gallery" style="display: none;">
-      <!-- 添加新相片表单 -->
       <div class="card">
-        <h2 class="card-title">📸 添加新相片到相册</h2>
-        <p class="card-desc">自动使用 macOS 底层引擎提取真实宽高比（Ratio）、转换为高压缩比 WebP、自动按序分配编号，并写入相册数据库。</p>
-
-        <div class="form-group">
-          <label class="form-label">选择图片文件（PNG / JPG / JPEG / WebP）</label>
-          <div class="input-with-button">
-            <input type="text" id="gallery-file-path" class="form-input" placeholder="点击右侧按钮选择图片，或输入图片绝对路径...">
-            <button class="btn btn-primary" onclick="pickFile('image')">📂 选择图片文件...</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 class="card-title" style="margin-bottom:0;">📸 添加作品到相册</h2>
+          <div class="subtab-buttons">
+            <button class="btn btn-sm btn-primary" id="tab-gallery-single-btn" onclick="switchGalleryMode('single')">单图添加</button>
+            <button class="btn btn-sm" id="tab-gallery-batch-btn" onclick="switchGalleryMode('batch')">📁 批量导入目录</button>
           </div>
         </div>
 
-        <div class="grid-3">
+        <!-- 单图模式 -->
+        <div id="gallery-single-mode">
           <div class="form-group">
-            <label class="form-label">所属相册分类</label>
-            <select id="gallery-cat" class="form-input">
-              <option value="anime">🎨 动漫插画 (Anime · collection-XX.webp)</option>
-              <option value="photography">📷 摄影大片 (Photography · photo-XX.webp)</option>
-              <option value="daily">☕ 生活日常 (Daily · daily-XX.webp)</option>
-            </select>
+            <label class="form-label">选择单张图片（PNG / JPG / JPEG / WebP）</label>
+            <div class="input-with-button">
+              <input type="text" id="gallery-file-path" class="form-input" placeholder="选择图片，或输入图片绝对路径...">
+              <button class="btn btn-primary" onclick="pickFile('image')">📂 选择图片...</button>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">作品标题 / 描述 (Caption)</label>
-            <input type="text" id="gallery-caption" class="form-input" placeholder="例如：苍崎青子·魔弹 或 雨后街角">
-          </div>
-          <div class="form-group">
-            <label class="form-label">标签 (逗号分隔)</label>
-            <input type="text" id="gallery-tags" class="form-input" placeholder="例如：魔法使之夜,型月,壁纸">
-          </div>
-        </div>
 
-        <div style="margin-top: 10px;">
+          <div class="grid-3">
+            <div class="form-group">
+              <label class="form-label">所属相册分类</label>
+              <select id="gallery-cat" class="form-input">
+                <option value="anime">🎨 动漫插画 (Anime · collection-XX.webp)</option>
+                <option value="photography">📷 摄影大片 (Photography · photo-XX.webp)</option>
+                <option value="daily">☕ 生活日常 (Daily · daily-XX.webp)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">作品标题 / 描述 (Caption)</label>
+              <input type="text" id="gallery-caption" class="form-input" placeholder="例如：苍崎青子·魔弹">
+            </div>
+            <div class="form-group">
+              <label class="form-label">标签 (逗号分隔)</label>
+              <input type="text" id="gallery-tags" class="form-input" placeholder="例如：魔法使之夜,型月,壁纸">
+            </div>
+          </div>
+
           <button class="btn btn-primary" id="add-gallery-btn" onclick="doAddGallery()">
             ✨ 自动测量宽高、转码并加入相册
+          </button>
+        </div>
+
+        <!-- 批量导入模式 -->
+        <div id="gallery-batch-mode" style="display: none;">
+          <div class="form-group">
+            <label class="form-label">选择图片所在的文件夹目录</label>
+            <div class="input-with-button">
+              <input type="text" id="gallery-batch-folder" class="form-input" placeholder="选择包含图片的文件夹路径...">
+              <button class="btn btn-primary" onclick="pickFolder()">📂 选择文件夹...</button>
+            </div>
+            <p class="form-hint">💡 后台将自动扫描该文件夹内所有 PNG/JPG/WebP 图片，自动逐个计算长宽比、按序编号并批量写入相册数据库。</p>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">批量导入分类</label>
+              <select id="gallery-batch-cat" class="form-input">
+                <option value="photography">📷 摄影大片 (Photography · photo-XX.webp)</option>
+                <option value="daily">☕ 生活日常 (Daily · daily-XX.webp)</option>
+                <option value="anime">🎨 动漫插画 (Anime · collection-XX.webp)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">默认标签 (逗号分隔)</label>
+              <input type="text" id="gallery-batch-tags" class="form-input" placeholder="例如：旅行,风景,街拍">
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="batch-gallery-btn" onclick="doBatchGallery()">
+            🚀 一键批量扫描并导入相册
           </button>
         </div>
 
@@ -942,10 +1130,10 @@ HTML_PAGE = """<!DOCTYPE html>
               <tr>
                 <th style="width: 80px;">类型</th>
                 <th style="width: 90px;">状态</th>
-                <th style="width: 110px;">日期</th>
+                <th style="width: 100px;">日期</th>
                 <th>文章标题</th>
-                <th style="width: 180px;">Slug 标识</th>
-                <th style="width: 200px;">快捷操作</th>
+                <th style="width: 160px;">Slug 标识</th>
+                <th style="width: 250px;">快捷操作</th>
               </tr>
             </thead>
             <tbody id="articles-tbody">
@@ -971,7 +1159,10 @@ HTML_PAGE = """<!DOCTYPE html>
             <div class="stat-label">当前本地 Git 状态</div>
             <div id="git-status-summary" style="font-weight: 600; margin-top: 4px;">检测中...</div>
           </div>
-          <button class="btn btn-sm" onclick="checkGitStatus()">🔄 检查变动</button>
+          <div style="display:flex; gap:8px;">
+            <a class="btn btn-sm" href="https://github.com/find-xin/find-xin.github.io/actions" target="_blank">⚡ 查看 Actions 自动构建</a>
+            <button class="btn btn-sm" onclick="checkGitStatus()">🔄 检查变动</button>
+          </div>
         </div>
 
         <div class="form-group">
@@ -997,10 +1188,59 @@ HTML_PAGE = """<!DOCTYPE html>
     </section>
   </main>
 
+  <!-- 全屏大图 Lightbox Modal -->
+  <div class="modal-overlay" id="gallery-modal" onclick="closeModal(event)">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title" style="font-size:1.05rem; font-weight:700;">作品详情</h3>
+        <button class="btn btn-sm" onclick="closeModalDirect()">✕ 关闭</button>
+      </div>
+      <div class="modal-body">
+        <img class="modal-img" id="modal-img" src="" alt="">
+      </div>
+      <div class="modal-footer">
+        <div id="modal-meta" style="font-size:0.85rem; color:var(--text-muted);"></div>
+        <div style="display:flex; gap:8px;">
+          <a class="btn btn-sm" id="modal-orig-link" href="" target="_blank">🔍 查看高清原图</a>
+          <button class="btn btn-sm btn-danger" id="modal-del-btn" onclick="deleteFromModal()">🗑️ 移出相册</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     let allArticles = [];
     let allGallery = [];
     let curGalleryCat = 'all';
+    let curModalItem = null;
+
+    /* Toast 提示系统 */
+    function showToast(message, type = 'info') {
+      let container = document.getElementById('toast-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.cssText = 'position:fixed; top:20px; right:20px; z-index:99999; display:flex; flex-direction:column; gap:10px; pointer-events:none;';
+        document.body.appendChild(container);
+      }
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'var(--success)' : (type === 'error' ? 'var(--accent)' : 'var(--primary)');
+      toast.style.cssText = `background:${bg}; color:#fff; padding:10px 18px; border-radius:8px; font-size:0.88rem; font-weight:500; box-shadow:0 4px 16px rgba(0,0,0,0.2); display:flex; align-items:center; gap:8px; opacity:0; transform:translateY(-8px); transition:all 0.25s cubic-bezier(0.16,1,0.3,1); pointer-events:auto;`;
+      const icon = type === 'success' ? '✓' : (type === 'error' ? '✕' : 'ℹ');
+      toast.innerHTML = `<span style="font-weight:700;">${icon}</span><span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+      });
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
 
     function toggleTheme() {
       document.body.classList.toggle('dark');
@@ -1020,6 +1260,7 @@ HTML_PAGE = """<!DOCTYPE html>
       if (tabId === 'publish') {
         document.querySelectorAll('.tab-btn')[0].classList.add('active');
         document.getElementById('tab-publish').style.display = 'block';
+        loadRecentNotes();
       } else if (tabId === 'gallery') {
         document.querySelectorAll('.tab-btn')[1].classList.add('active');
         document.getElementById('tab-gallery').style.display = 'block';
@@ -1035,6 +1276,29 @@ HTML_PAGE = """<!DOCTYPE html>
       }
     }
 
+    /* 近期笔记智能发现 */
+    async function loadRecentNotes() {
+      try {
+        const res = await fetch('/api/recent-notes');
+        const notes = await res.json();
+        const chipsContainer = document.getElementById('recent-notes-chips');
+        if (!notes || notes.length === 0) {
+          chipsContainer.innerHTML = '<span class="chip" style="color:var(--text-muted);">（可点击上方浏览按钮选择笔记）</span>';
+          return;
+        }
+        chipsContainer.innerHTML = notes.map(n => `
+          <span class="chip" onclick="selectRecentNote('${escapeJs(n.path)}')">
+            ${n.ext === '.ipynb' ? '📓' : '📄'} ${escapeHtml(n.name)} <small style="opacity:0.75;">(${n.rel_time})</small>
+          </span>
+        `).join('');
+      } catch (e) {}
+    }
+
+    function selectRecentNote(path) {
+      document.getElementById('file-path').value = path;
+      showToast('已填入笔记路径', 'success');
+    }
+
     async function pickFile(type) {
       try {
         const res = await fetch('/api/pick-file?type=' + type);
@@ -1045,9 +1309,23 @@ HTML_PAGE = """<!DOCTYPE html>
           } else {
             document.getElementById('file-path').value = data.path;
           }
+          showToast('已成功选择文件', 'success');
         }
       } catch (e) {
-        alert('文件选择器调用失败：' + e.message);
+        showToast('选择器调用失败：' + e.message, 'error');
+      }
+    }
+
+    async function pickFolder() {
+      try {
+        const res = await fetch('/api/pick-file?type=folder');
+        const data = await res.json();
+        if (data.path) {
+          document.getElementById('gallery-batch-folder').value = data.path;
+          showToast('已选择文件夹', 'success');
+        }
+      } catch (e) {
+        showToast('文件夹选择失败：' + e.message, 'error');
       }
     }
 
@@ -1094,7 +1372,7 @@ HTML_PAGE = """<!DOCTYPE html>
           toggleBtn.disabled = false;
         }, 800);
       } catch (e) {
-        alert('操作失败：' + e.message);
+        showToast('操作失败：' + e.message, 'error');
         toggleBtn.disabled = false;
       }
     }
@@ -1102,7 +1380,7 @@ HTML_PAGE = """<!DOCTYPE html>
     /* 发布笔记 */
     async function doPublish() {
       const path = document.getElementById('file-path').value.trim();
-      if (!path) { alert('请先选择或输入笔记文件的完整路径！'); return; }
+      if (!path) { showToast('请先选择或输入笔记文件的完整路径！', 'error'); return; }
 
       const btn = document.getElementById('publish-btn');
       const log = document.getElementById('publish-log');
@@ -1127,15 +1405,34 @@ HTML_PAGE = """<!DOCTYPE html>
         const data = await res.json();
         log.textContent = data.output || data.message;
         if (data.success) {
-          log.textContent += '\\n✅ 处理成功！可前往「全站文章管理」或「部署到 GitHub」查看。';
+          showToast('🎉 发布成功！已生成页面包', 'success');
         } else {
-          log.textContent += '\\n❌ 处理失败：' + data.message;
+          showToast('❌ 发布失败：' + data.message, 'error');
         }
       } catch (e) {
-        log.textContent += '\\n❌ 出现异常：' + e.message;
+        showToast('出现异常：' + e.message, 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = '🚀 立即转换并发布';
+      }
+    }
+
+    /* 相册单图 / 批量切换 */
+    function switchGalleryMode(mode) {
+      const singleBtn = document.getElementById('tab-gallery-single-btn');
+      const batchBtn = document.getElementById('tab-gallery-batch-btn');
+      const singleDiv = document.getElementById('gallery-single-mode');
+      const batchDiv = document.getElementById('gallery-batch-mode');
+      if (mode === 'single') {
+        singleBtn.className = 'btn btn-sm btn-primary';
+        batchBtn.className = 'btn btn-sm';
+        singleDiv.style.display = 'block';
+        batchDiv.style.display = 'none';
+      } else {
+        singleBtn.className = 'btn btn-sm';
+        batchBtn.className = 'btn btn-sm btn-primary';
+        singleDiv.style.display = 'none';
+        batchDiv.style.display = 'block';
       }
     }
 
@@ -1169,8 +1466,8 @@ HTML_PAGE = """<!DOCTYPE html>
         container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);">暂无此分类照片</div>';
         return;
       }
-      container.innerHTML = list.map(item => `
-        <div class="gallery-card">
+      container.innerHTML = list.map((item, idx) => `
+        <div class="gallery-card" onclick="openGalleryModal(${idx})">
           <div class="gallery-card-img-wrap">
             <img class="gallery-card-img" src="${item.image}" alt="${escapeHtml(item.caption)}" loading="lazy">
             <span class="gallery-card-badge">#${item.number}</span>
@@ -1183,7 +1480,7 @@ HTML_PAGE = """<!DOCTYPE html>
                 <span>${item.category === 'anime' ? '🎨 动漫' : (item.category === 'photography' ? '📷 摄影' : '☕ 日常')}</span>
               </div>
             </div>
-            <div class="gallery-card-actions">
+            <div class="gallery-card-actions" onclick="event.stopPropagation()">
               <a class="btn btn-sm" href="${item.image}" target="_blank">🔍 原图</a>
               <button class="btn btn-sm btn-danger" onclick="confirmDeleteGallery('${item.image}', '${escapeHtml(item.caption)}')">🗑️ 移除</button>
             </div>
@@ -1192,9 +1489,39 @@ HTML_PAGE = """<!DOCTYPE html>
       `).join('');
     }
 
+    function openGalleryModal(idx) {
+      const list = curGalleryCat === 'all' ? allGallery : allGallery.filter(x => x.category === curGalleryCat);
+      const item = list[idx];
+      if (!item) return;
+      curModalItem = item;
+      document.getElementById('modal-title').textContent = (item.caption || '作品详情') + ' (#' + item.number + ')';
+      document.getElementById('modal-img').src = item.image;
+      document.getElementById('modal-orig-link').href = item.image;
+      document.getElementById('modal-meta').innerHTML = `
+        <strong>分类：</strong>${item.category} &nbsp;|&nbsp; 
+        <strong>长宽比：</strong>${item.ratio} &nbsp;|&nbsp; 
+        <strong>标签：</strong>${(item.tags || []).join(', ') || '无'}
+      `;
+      document.getElementById('gallery-modal').classList.add('is-active');
+    }
+
+    function closeModal(e) {
+      if (e.target.id === 'gallery-modal') {
+        closeModalDirect();
+      }
+    }
+    function closeModalDirect() {
+      document.getElementById('gallery-modal').classList.remove('is-active');
+    }
+    function deleteFromModal() {
+      if (!curModalItem) return;
+      closeModalDirect();
+      confirmDeleteGallery(curModalItem.image, curModalItem.caption);
+    }
+
     async function doAddGallery() {
       const path = document.getElementById('gallery-file-path').value.trim();
-      if (!path) { alert('请先选择或输入图片文件路径！'); return; }
+      if (!path) { showToast('请先选择或输入图片文件路径！', 'error'); return; }
 
       const btn = document.getElementById('add-gallery-btn');
       const log = document.getElementById('gallery-log');
@@ -1217,21 +1544,60 @@ HTML_PAGE = """<!DOCTYPE html>
         const data = await res.json();
         log.textContent = data.message;
         if (data.success) {
-          log.textContent += '\\n✅ 已成功写入相册数据库！';
+          showToast('🎉 成功加入相册！', 'success');
           document.getElementById('gallery-file-path').value = '';
           document.getElementById('gallery-caption').value = '';
           loadGallery();
+        } else {
+          showToast(data.message, 'error');
         }
       } catch (e) {
-        log.textContent += '\\n❌ 操作失败：' + e.message;
+        showToast('操作失败：' + e.message, 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = '✨ 自动测量宽高、转码并加入相册';
       }
     }
 
+    async function doBatchGallery() {
+      const folder = document.getElementById('gallery-batch-folder').value.trim();
+      if (!folder) { showToast('请先选择图片文件夹！', 'error'); return; }
+
+      const btn = document.getElementById('batch-gallery-btn');
+      const log = document.getElementById('gallery-log');
+      btn.disabled = true;
+      btn.textContent = '⏳ 正在批量处理中...';
+      log.style.display = 'block';
+      log.textContent = '正在扫描并逐个测量转码...\\n';
+
+      try {
+        const res = await fetch('/api/gallery/batch-add', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            folder: folder,
+            category: document.getElementById('gallery-batch-cat').value,
+            tags: document.getElementById('gallery-batch-tags').value.trim()
+          })
+        });
+        const data = await res.json();
+        log.textContent = data.message;
+        if (data.success) {
+          showToast(data.message, 'success');
+          loadGallery();
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (e) {
+        showToast('批量导入异常：' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 一键批量扫描并导入相册';
+      }
+    }
+
     async function confirmDeleteGallery(imgUrl, caption) {
-      if (!confirm(`确定要从相册中移除《${caption || imgUrl}》吗？关联的 webp 图片也将被清理。`)) return;
+      if (!confirm(`确定要从相册中移除《${caption || imgUrl}》吗？`)) return;
       try {
         const res = await fetch('/api/gallery/delete', {
           method: 'POST',
@@ -1240,11 +1606,12 @@ HTML_PAGE = """<!DOCTYPE html>
         });
         const data = await res.json();
         if (data.success) {
+          showToast('已从相册中移除', 'success');
           loadGallery();
         } else {
-          alert('移除失败：' + data.message);
+          showToast('移除失败：' + data.message, 'error');
         }
-      } catch (e) { alert('请求异常：' + e.message); }
+      } catch (e) { showToast('请求异常：' + e.message, 'error'); }
     }
 
     /* 文章列表管理 */
@@ -1283,8 +1650,9 @@ HTML_PAGE = """<!DOCTYPE html>
           </td>
           <td><code style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(item.slug)}</code></td>
           <td>
-            <div style="display:flex;gap:6px;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
               <a class="btn btn-sm" href="http://localhost:1314${item.url}" target="_blank" title="在新标签页预览">👁️ 预览</a>
+              <button class="btn btn-sm" onclick="openInLocalEditor('${escapeJs(item.path)}')">✏️ 编辑</button>
               <button class="btn btn-sm" onclick="toggleDraft('${item.slug}', ${!item.draft})">${item.draft ? '🟢 上架' : '🟡 下架'}</button>
               <button class="btn btn-sm btn-danger" onclick="confirmDelete('${item.slug}', '${escapeHtml(item.title)}')">🗑️ 删除</button>
             </div>
@@ -1300,6 +1668,22 @@ HTML_PAGE = """<!DOCTYPE html>
       renderArticles(filtered);
     }
 
+    async function openInLocalEditor(path) {
+      try {
+        const res = await fetch('/api/open-file', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({path: path})
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('已在系统默认应用中打开', 'success');
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (e) { showToast('打开异常：' + e.message, 'error'); }
+    }
+
     async function toggleDraft(slug, makeDraft) {
       try {
         const res = await fetch('/api/set-draft', {
@@ -1309,15 +1693,16 @@ HTML_PAGE = """<!DOCTYPE html>
         });
         const data = await res.json();
         if (data.success) {
+          showToast(`已${makeDraft ? '下架为草稿' : '重新上架'}`, 'success');
           loadArticles();
         } else {
-          alert('操作失败：' + data.message);
+          showToast('操作失败：' + data.message, 'error');
         }
-      } catch (e) { alert('请求异常：' + e.message); }
+      } catch (e) { showToast('请求异常：' + e.message, 'error'); }
     }
 
     async function confirmDelete(slug, title) {
-      if (!confirm(`确定要彻底删除《${title}》及其关联附件文件夹吗？此操作无法撤销。`)) return;
+      if (!confirm(`确定彻底删除《${title}》及其专属附件吗？此操作不可撤销。`)) return;
       try {
         const res = await fetch('/api/delete', {
           method: 'POST',
@@ -1326,11 +1711,12 @@ HTML_PAGE = """<!DOCTYPE html>
         });
         const data = await res.json();
         if (data.success) {
+          showToast('已安全删除文章', 'success');
           loadArticles();
         } else {
-          alert('删除失败：' + data.message);
+          showToast('删除失败：' + data.message, 'error');
         }
-      } catch (e) { alert('请求异常：' + e.message); }
+      } catch (e) { showToast('请求异常：' + e.message, 'error'); }
     }
 
     /* Git 部署 */
@@ -1366,13 +1752,13 @@ HTML_PAGE = """<!DOCTYPE html>
         const data = await res.json();
         log.textContent = data.output;
         if (data.success) {
-          log.textContent += '\\n🎉 推送成功！GitHub Actions 已触发自动构建，约 1 分钟后线上即可访问。';
+          showToast('🎉 推送成功！已触发自动构建上线', 'success');
           checkGitStatus();
         } else {
-          log.textContent += '\\n❌ 推送遇到问题，请检查网络或输出日志。';
+          showToast('❌ 推送遇到问题，请查看日志', 'error');
         }
       } catch (e) {
-        log.textContent += '\\n❌ 出现网络异常：' + e.message;
+        showToast('网络异常：' + e.message, 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = '🚀 提交并推送到 GitHub';
@@ -1383,6 +1769,13 @@ HTML_PAGE = """<!DOCTYPE html>
       if (!str) return '';
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+    function escapeJs(str) {
+      if (!str) return '';
+      return String(str).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
+    }
+
+    // 初始化加载
+    loadRecentNotes();
   </script>
 </body>
 </html>
@@ -1390,7 +1783,7 @@ HTML_PAGE = """<!DOCTYPE html>
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        pass  # 保持终端整洁
+        pass
 
     def serve_file(self, filepath: Path):
         mime = MIME_TYPES.get(filepath.suffix.lower(), 'application/octet-stream')
@@ -1427,6 +1820,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif url.path == '/api/gallery':
             items = get_gallery_images()
             self.send_json(items)
+        elif url.path == '/api/recent-notes':
+            notes = scan_recent_notes()
+            self.send_json(notes)
         elif url.path == '/api/hugo-status':
             running = is_port_in_use(1314)
             self.send_json({'running': running})
@@ -1438,6 +1834,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             ftype = query.get('type', ['note'])[0]
             if ftype == 'image':
                 selected = pick_file_macos("选择相册图片文件", '{"png", "jpg", "jpeg", "webp", "gif"}')
+            elif ftype == 'folder':
+                selected = pick_file_macos("选择包含图片的文件夹", is_folder=True)
             else:
                 selected = pick_file_macos("选择笔记或Notebook文件", '{"md", "ipynb", "markdown"}')
             self.send_json({'path': selected})
@@ -1501,9 +1899,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
             ok, msg = add_gallery_image(fpath, cat, caption, tags)
             self.send_json({'success': ok, 'message': msg})
 
+        elif url.path == '/api/gallery/batch-add':
+            folder = payload.get('folder', '').strip()
+            cat = payload.get('category', 'photography').strip()
+            tags_raw = payload.get('tags', '').strip()
+            tags = [t.strip() for t in tags_raw.split(',') if t.strip()]
+            ok, msg, count = batch_add_gallery(folder, cat, tags)
+            self.send_json({'success': ok, 'message': msg, 'count': count})
+
         elif url.path == '/api/gallery/delete':
             img_url = payload.get('image', '').strip()
             ok, msg = delete_gallery_image(img_url)
+            self.send_json({'success': ok, 'message': msg})
+
+        elif url.path == '/api/open-file':
+            target_path = payload.get('path', '').strip()
+            ok, msg = open_local_path(target_path)
             self.send_json({'success': ok, 'message': msg})
 
         elif url.path == '/api/set-draft':
@@ -1551,7 +1962,7 @@ def run_server():
     server = HTTPServer(('127.0.0.1', port), DashboardHandler)
     url = f"http://localhost:{port}"
     print(f"\n=======================================================")
-    print(f"✨ 有珠之夜 · 博客桌面可视化控制台 2.0 已启动！")
+    print(f"✨ 有珠之夜 · 博客管理控制台 3.0 Ultimate 已启动！")
     print(f"🌐 访问地址：{url}")
     print(f"💡 浏览器已自动打开。按 Ctrl + C 可关闭控制台。")
     print(f"=======================================================\n")
