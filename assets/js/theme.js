@@ -259,12 +259,14 @@
   const spotlightInput = document.getElementById('spotlight-input');
   const spotlightResults = document.getElementById('spotlight-results');
   const spotlightStatus = document.getElementById('spotlight-status');
+  const spotlightFilters = document.getElementById('spotlight-filters');
   const spotlightBody = document.querySelector('.spotlight-body');
   let searchDocuments = null;
   let activeIndex = -1;
   let isKeyboardNavigating = false;
   let lastMouseX = -1;
   let lastMouseY = -1;
+  let currentFilter = 'all';
 
   const escapeHTML = (str) => {
     return (str || '').replace(/[&<>'"]/g, tag => ({
@@ -280,12 +282,49 @@
     return escapedText.replace(regex, '<mark>$1</mark>');
   };
 
+  const parseQueryScope = (rawQuery) => {
+    let scope = null;
+    let cleanQuery = (rawQuery || '').trim();
+
+    const prefixMatch = cleanQuery.match(/^([@#]|in:|type:)(日记|文章|相册|diary|posts?|gallery)(?:\s+(.*)|$)/i);
+    if (prefixMatch) {
+      const typeStr = prefixMatch[2].toLowerCase();
+      if (typeStr === '日记' || typeStr === 'diary') scope = 'diary';
+      else if (typeStr === '文章' || typeStr === 'post' || typeStr === 'posts') scope = 'posts';
+      else if (typeStr === '相册' || typeStr === 'gallery') scope = 'gallery';
+      cleanQuery = (prefixMatch[3] || '').trim();
+    }
+
+    return { scope, cleanQuery };
+  };
+
+  const updateFilterUI = (activeScope) => {
+    if (!spotlightFilters) return;
+    spotlightFilters.querySelectorAll('.spotlight-filter-btn').forEach(btn => {
+      const isTarget = btn.dataset.filter === activeScope;
+      btn.classList.toggle('is-active', isTarget);
+      btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+    });
+  };
+
+  const updateFilterCounts = (counts) => {
+    if (!spotlightFilters) return;
+    spotlightFilters.querySelectorAll('.filter-count').forEach(span => {
+      const filterKey = span.dataset.countFor;
+      if (filterKey && typeof counts[filterKey] === 'number') {
+        span.textContent = counts[filterKey] > 0 ? counts[filterKey] : '';
+      } else {
+        span.textContent = '';
+      }
+    });
+  };
+
   const renderSpotlightInitial = () => {
     if (!spotlightResults) return;
     spotlightResults.innerHTML = `
       <div class="spotlight-state-empty">
         <span class="spotlight-empty-spark">✦</span>
-        <p>输入关键词实时检索 · 支持方向键 ↑ ↓ 选择 · 回车直达</p>
+        <p>输入关键词实时检索 · Tab 切换分类 · 支持 @日记 快速指定</p>
       </div>
     `;
     activeIndex = -1;
@@ -299,6 +338,8 @@
     isKeyboardNavigating = false;
     lastMouseX = -1;
     lastMouseY = -1;
+    currentFilter = 'all';
+    updateFilterUI('all');
     if (spotlightInput) {
       spotlightInput.value = '';
       spotlightInput.focus();
@@ -312,10 +353,23 @@
         if (res.ok) {
           searchDocuments = await res.json();
           if (spotlightStatus) spotlightStatus.textContent = `${searchDocuments.length} 篇内容已就绪`;
+          updateFilterCounts({
+            all: searchDocuments.length,
+            posts: searchDocuments.filter(d => d.section === 'posts').length,
+            diary: searchDocuments.filter(d => d.section === 'diary').length,
+            gallery: searchDocuments.filter(d => d.section === 'gallery').length
+          });
         }
       } catch (_) {
         if (spotlightStatus) spotlightStatus.textContent = '索引异常';
       }
+    } else {
+      updateFilterCounts({
+        all: searchDocuments.length,
+        posts: searchDocuments.filter(d => d.section === 'posts').length,
+        diary: searchDocuments.filter(d => d.section === 'diary').length,
+        gallery: searchDocuments.filter(d => d.section === 'gallery').length
+      });
     }
   };
 
@@ -356,31 +410,14 @@
     }
   };
 
-  const performSearch = (query) => {
+  const renderResultsList = (matches, queryTerm, emptyMessage) => {
     if (!spotlightResults) return;
-    const q = query.trim().toLowerCase();
-    if (!q) {
-      renderSpotlightInitial();
-      return;
-    }
-
-    if (!searchDocuments) {
-      spotlightResults.innerHTML = '<div class="spotlight-state-empty"><p>索引加载中，请稍候...</p></div>';
-      return;
-    }
-
-    const matches = searchDocuments.filter(doc => {
-      const titleMatch = (doc.title || '').toLowerCase().includes(q);
-      const snippetMatch = (doc.snippet || '').toLowerCase().includes(q);
-      const tagMatch = (doc.tags || []).some(t => (t || '').toLowerCase().includes(q));
-      return titleMatch || snippetMatch || tagMatch;
-    });
 
     if (matches.length === 0) {
-      spotlightResults.innerHTML = `
+      spotlightResults.innerHTML = emptyMessage || `
         <div class="spotlight-state-empty">
           <span class="spotlight-empty-spark">🪐</span>
-          <p>未找到关于 “${escapeHTML(query)}” 的相关内容</p>
+          <p>未找到相关内容</p>
         </div>
       `;
       activeIndex = -1;
@@ -397,14 +434,16 @@
       const sectionBadge = isDiary ? '日记' : (isGallery ? (item.category ? `相册 · ${item.category}` : '相册') : (item.section === 'posts' ? '文章' : '页面'));
       const badgeClass = isDiary ? 'badge-diary' : (isGallery ? 'badge-gallery' : 'badge-post');
       const timeDisplay = isGallery ? (item.date || '') : `${item.year ? item.year + '-' : ''}${item.date || ''}`;
+      const titleHTML = queryTerm ? highlightMatch(item.title || '', queryTerm) : escapeHTML(item.title || '');
+      const snippetHTML = item.snippet ? (queryTerm ? highlightMatch(item.snippet, queryTerm) : escapeHTML(item.snippet)) : '';
       return `
         <a class="spotlight-item${idx === 0 ? ' is-active' : ''}" href="${item.url}" data-index="${idx}">
           <div class="spotlight-item-header">
             <span class="spotlight-badge ${badgeClass}">${sectionBadge}</span>
-            <span class="spotlight-item-title">${highlightMatch(item.title || '', q)}</span>
+            <span class="spotlight-item-title">${titleHTML}</span>
             <time class="spotlight-item-date">${timeDisplay}</time>
           </div>
-          ${item.snippet ? `<p class="spotlight-item-snippet">${highlightMatch(item.snippet, q)}</p>` : ''}
+          ${snippetHTML ? `<p class="spotlight-item-snippet">${snippetHTML}</p>` : ''}
         </a>
       `;
     }).join('');
@@ -418,6 +457,84 @@
         activeIndex = parseInt(el.dataset.index, 10);
       });
     });
+  };
+
+  const performSearch = (query) => {
+    if (!spotlightResults) return;
+
+    const { scope: parsedScope, cleanQuery } = parseQueryScope(query);
+    const effectiveScope = parsedScope || currentFilter || 'all';
+
+    if (parsedScope && currentFilter !== parsedScope) {
+      currentFilter = parsedScope;
+    }
+    updateFilterUI(effectiveScope);
+
+    if (!searchDocuments) {
+      spotlightResults.innerHTML = '<div class="spotlight-state-empty"><p>索引加载中，请稍候...</p></div>';
+      return;
+    }
+
+    if (!cleanQuery) {
+      if (effectiveScope !== 'all') {
+        const scopedDocs = searchDocuments.filter(d => d.section === effectiveScope);
+        updateFilterCounts({
+          all: searchDocuments.length,
+          posts: searchDocuments.filter(d => d.section === 'posts').length,
+          diary: searchDocuments.filter(d => d.section === 'diary').length,
+          gallery: searchDocuments.filter(d => d.section === 'gallery').length
+        });
+        renderResultsList(scopedDocs.slice(0, 30), '', '');
+        return;
+      }
+      renderSpotlightInitial();
+      updateFilterCounts({
+        all: searchDocuments.length,
+        posts: searchDocuments.filter(d => d.section === 'posts').length,
+        diary: searchDocuments.filter(d => d.section === 'diary').length,
+        gallery: searchDocuments.filter(d => d.section === 'gallery').length
+      });
+      return;
+    }
+
+    const q = cleanQuery.toLowerCase();
+
+    // 1. 全站匹配
+    const allMatches = searchDocuments.filter(doc => {
+      const titleMatch = (doc.title || '').toLowerCase().includes(q);
+      const snippetMatch = (doc.snippet || '').toLowerCase().includes(q);
+      const tagMatch = (doc.tags || []).some(t => (t || '').toLowerCase().includes(q));
+      return titleMatch || snippetMatch || tagMatch;
+    });
+
+    // 2. 更新分类匹配数量
+    const counts = {
+      all: allMatches.length,
+      posts: allMatches.filter(d => d.section === 'posts').length,
+      diary: allMatches.filter(d => d.section === 'diary').length,
+      gallery: allMatches.filter(d => d.section === 'gallery').length
+    };
+    updateFilterCounts(counts);
+
+    // 3. 当前有效范围过滤
+    const matches = effectiveScope === 'all'
+      ? allMatches
+      : allMatches.filter(d => d.section === effectiveScope);
+
+    const scopeLabel = effectiveScope === 'posts' ? '文章' : (effectiveScope === 'diary' ? '日记' : (effectiveScope === 'gallery' ? '相册' : ''));
+    const tipAll = effectiveScope !== 'all' && counts.all > 0
+      ? `<p class="spotlight-empty-hint">在「${scopeLabel}」中未找到，但在全部中有 ${counts.all} 篇匹配结果，按 <kbd>Tab</kbd> 可切换查看。</p>`
+      : '';
+
+    const emptyMessage = `
+      <div class="spotlight-state-empty">
+        <span class="spotlight-empty-spark">🪐</span>
+        <p>未找到${scopeLabel ? `「${scopeLabel}」中` : ''}关于 “${escapeHTML(cleanQuery)}” 的相关内容</p>
+        ${tipAll}
+      </div>
+    `;
+
+    renderResultsList(matches, q, emptyMessage);
   };
 
   // 经典 macOS 碰壁回弹提示音 (Web Audio API 合成)
@@ -487,6 +604,33 @@
     });
 
     spotlightInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const filters = ['all', 'posts', 'diary', 'gallery'];
+        let idx = filters.indexOf(currentFilter);
+        if (idx === -1) idx = 0;
+        if (e.shiftKey) {
+          idx = (idx - 1 + filters.length) % filters.length;
+        } else {
+          idx = (idx + 1) % filters.length;
+        }
+        currentFilter = filters[idx];
+        updateFilterUI(currentFilter);
+
+        // 如果输入框里有 @xxx 前缀，切换 Tab 时同步更新前缀；否则保留输入内容
+        const { scope, cleanQuery } = parseQueryScope(spotlightInput.value);
+        if (scope) {
+          if (currentFilter === 'all') {
+            spotlightInput.value = cleanQuery;
+          } else {
+            const prefixName = currentFilter === 'posts' ? '文章' : (currentFilter === 'diary' ? '日记' : '相册');
+            spotlightInput.value = `@${prefixName} ${cleanQuery}`.trim();
+          }
+        }
+        performSearch(spotlightInput.value);
+        return;
+      }
+
       const items = Array.from(spotlightResults ? spotlightResults.querySelectorAll('.spotlight-item') : []);
       if (items.length === 0) return;
 
@@ -524,6 +668,28 @@
           window.location.href = items[activeIndex].href;
         }
       }
+    });
+  }
+
+  if (spotlightFilters) {
+    spotlightFilters.querySelectorAll('.spotlight-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentFilter = btn.dataset.filter || 'all';
+        updateFilterUI(currentFilter);
+        if (spotlightInput) {
+          const { scope, cleanQuery } = parseQueryScope(spotlightInput.value);
+          if (scope) {
+            if (currentFilter === 'all') {
+              spotlightInput.value = cleanQuery;
+            } else {
+              const prefixName = currentFilter === 'posts' ? '文章' : (currentFilter === 'diary' ? '日记' : '相册');
+              spotlightInput.value = `@${prefixName} ${cleanQuery}`.trim();
+            }
+          }
+          spotlightInput.focus();
+          performSearch(spotlightInput.value);
+        }
+      });
     });
   }
 

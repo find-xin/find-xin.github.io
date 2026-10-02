@@ -10,17 +10,32 @@
         <kbd class="spotlight-kbd" id="spotlight-close-btn" title="按 ESC 关闭">ESC</kbd>
       </div>
     </div>
+    <div class="spotlight-filters" id="spotlight-filters" role="tablist" aria-label="搜索类型过滤">
+      <button type="button" class="spotlight-filter-btn is-active" data-filter="all" role="tab" aria-selected="true">
+        全部 <span class="filter-count" data-count-for="all"></span>
+      </button>
+      <button type="button" class="spotlight-filter-btn" data-filter="posts" role="tab" aria-selected="false">
+        <span class="filter-icon">📝</span> 文章 <span class="filter-count" data-count-for="posts"></span>
+      </button>
+      <button type="button" class="spotlight-filter-btn" data-filter="diary" role="tab" aria-selected="false">
+        <span class="filter-icon">☕</span> 日记 <span class="filter-count" data-count-for="diary"></span>
+      </button>
+      <button type="button" class="spotlight-filter-btn" data-filter="gallery" role="tab" aria-selected="false">
+        <span class="filter-icon">🖼️</span> 相册 <span class="filter-count" data-count-for="gallery"></span>
+      </button>
+    </div>
     <div class="spotlight-body">
       <div id="spotlight-results" class="spotlight-results">
         <div class="spotlight-state-empty">
           <span class="spotlight-empty-spark">✦</span>
-          <p>输入关键词实时检索 · 支持方向键 ↑ ↓ 选择 · 回车直达</p>
+          <p>输入关键词实时检索 · Tab 切换分类 · 支持 @日记 快速指定</p>
         </div>
       </div>
     </div>
     <div class="spotlight-footer">
       <div class="spotlight-shortcuts">
         <span><kbd>↑</kbd><kbd>↓</kbd> 切换</span>
+        <span><kbd>tab</kbd> 分类</span>
         <span><kbd>↵</kbd> 直达</span>
         <span><kbd>esc</kbd> 关闭</span>
       </div>
