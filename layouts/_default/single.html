@@ -14,47 +14,30 @@
     {{ if and $coverUrl (not .Params.hideCover) }}<figure class="post-cover"><img src="{{ $coverUrl }}" alt="{{ $.Title }}配图" fetchpriority="high"></figure>{{ end }}
     <div class="post-meta">{{ range first 1 (.GetTerms "categories") }}<span class="post-category"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></span>{{ end }}<time class="post-date" datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ .Date.Format "2006-01-02 15:04" }}</time><span class="post-author">{{ site.Params.author }}</span>{{ if gt .WordCount 0 }}<span class="post-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟阅读</span>{{ end }}</div>
     <h1 class="post-title">{{ .Title }}</h1>
-    {{ with .GetTerms "tags" }}<div class="post-tags">{{ range . }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}
+    {{ with .GetTerms "tags" }}<div class="post-tags">{{ range . }}<a class="tag" href="{{ .RelPermalink }}">#{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}
   </header>
   <div class="post-content" id="post-content">
     {{ with .Params.pdf }}
       {{ if not (findRE "pdf-reader-container" $.Content) }}
-        {{ $pdfUrl := . }}
-        {{ if not (hasPrefix $pdfUrl "http") }}
-          {{ $pdfUrl = $pdfUrl | relURL }}
-        {{ end }}
-        <div class="pdf-reader-container" id="pdf-viewer-main">
-          <div class="pdf-reader-toolbar">
-            <div class="pdf-reader-info">
-              <span class="pdf-reader-icon" aria-hidden="true">📕</span>
-              <span class="pdf-reader-title">{{ $.Title }} · PDF 原文</span>
-            </div>
-            <div class="pdf-reader-actions">
-              <button type="button" class="pdf-btn pdf-btn-fullscreen" onclick="togglePdfFullscreen('pdf-viewer-main')" title="全屏阅读" aria-label="全屏阅读">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-                <span>全屏</span>
-              </button>
-              <a href="{{ $pdfUrl }}" target="_blank" rel="noopener noreferrer" class="pdf-btn" title="在新标签页中打开">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                <span>新窗口</span>
-              </a>
-              <a href="{{ $pdfUrl }}" download class="pdf-btn pdf-btn-primary" title="下载 PDF 文件">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>下载 PDF</span>
-              </a>
-            </div>
-          </div>
-          <div class="pdf-reader-frame-wrap" style="height: 780px;">
-            <iframe class="pdf-reader-iframe" src="{{ $pdfUrl }}#toolbar=1&navpanes=0" title="{{ $.Title }}" loading="lazy"></iframe>
-          </div>
-        </div>
+        {{ partial "pdf-viewer.html" (dict "src" . "title" (printf "%s · PDF 原文" $.Title) "id" "pdf-viewer-main" "height" "780px") }}
       {{ end }}
     {{ end }}
     {{ .Content }}
   </div>
-  <div class="post-updated-notice">
-    <svg class="post-updated-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-    <span>最后更新于 {{ .Lastmod.Format "2006-01-02 15:04" }}</span>
+  {{ $postID := .File.UniqueID | default .RelPermalink }}
+  <div class="post-detail-actions">
+    <div class="post-action-spacer" aria-hidden="true"></div>
+
+    <button class="post-detail-like-btn" type="button" aria-label="点赞" data-id="{{ $postID }}" data-likes="{{ .Params.likes | default 8 }}">
+      <span class="heart-icon">♡</span>
+      <span class="like-label">喜欢</span>
+      <span class="like-count">{{ .Params.likes | default 8 }}</span>
+    </button>
+
+    <div class="post-updated-notice">
+      <svg class="post-updated-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      <span>最后更新于 {{ .Lastmod.Format "2006-01-02 15:04" }}</span>
+    </div>
   </div>
   <div class="post-signature-card">
     <div class="signature-avatar-wrap">
@@ -84,7 +67,7 @@
         <div class="related-card-cover-wrap"><img class="related-card-cover" src="{{ . }}" alt="" loading="lazy" decoding="async"></div>
         {{ end }}
         <div class="related-card-body">
-          <time class="related-card-date">{{ .Date.Format "2006.01.02" }}</time>
+          <time class="related-card-date">{{ .Date.Format "2006-01-02" }}</time>
           <h4 class="related-card-title">{{ .Title }}</h4>
           {{ with .Summary }}<p class="related-card-snippet">{{ . | plainify | truncate 50 }}</p>{{ end }}
         </div>

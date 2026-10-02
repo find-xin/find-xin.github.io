@@ -1,10 +1,39 @@
 {{ $post := .page }}
+{{ $isLead := eq .size "lead" }}
 {{ $coverUrl := partial "image-url.html" (dict "context" $post "src" $post.Params.cover) }}
-<article class="article-card article-card--{{ .size }}{{ if not $coverUrl }} article-card--text{{ end }}">
-  {{ with $coverUrl }}<div class="article-image"><a href="{{ $post.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . }}" alt="" {{ if $.priority }}fetchpriority="high"{{ else }}loading="lazy"{{ end }}></a></div>{{ end }}
+<article class="article-card{{ if $isLead }} article-card--lead{{ else }} article-card--standard{{ end }}{{ if not $coverUrl }} article-card--text{{ end }}">
+  {{ if $coverUrl }}
+    <div class="article-image">
+      <div class="article-card-badges">
+        {{ if $post.Params.pinned }}<span class="article-badge article-badge--pinned">置顶</span>{{ end }}
+        {{ range first 1 ($post.GetTerms "categories") }}
+          <span class="article-badge article-badge--cat">{{ .LinkTitle }}</span>
+        {{ end }}
+      </div>
+      <a href="{{ $post.RelPermalink }}" tabindex="-1" aria-hidden="true">
+        <img src="{{ $coverUrl }}" alt="{{ $post.Title }}" {{ if $.priority }}fetchpriority="high"{{ else }}loading="lazy"{{ end }}>
+      </a>
+    </div>
+  {{ else }}
+    <div class="article-image article-image--text-cover">
+      <span class="article-text-watermark" aria-hidden="true">✦</span>
+      <div class="article-card-badges">
+        {{ if $post.Params.pinned }}<span class="article-badge article-badge--pinned">置顶</span>{{ end }}
+        {{ range first 1 ($post.GetTerms "categories") }}
+          <span class="article-badge article-badge--cat">{{ .LinkTitle }}</span>
+        {{ end }}
+      </div>
+      <p class="article-text-preview">{{ ($post.Summary | default $post.Description) | plainify | truncate 50 }}</p>
+    </div>
+  {{ end }}
   <div class="article-content">
     <div class="article-meta">
-      {{ if $post.Params.pinned }}<span class="article-sticky">置顶</span>{{ end }}
+      {{ if not $coverUrl }}
+        {{ if $post.Params.pinned }}<span class="article-sticky">置顶</span>{{ end }}
+        {{ range first 1 ($post.GetTerms "categories") }}
+          <a class="article-cat-link" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
+        {{ end }}
+      {{ end }}
       <time class="article-date" datetime="{{ $post.Date.Format "2006-01-02" }}">{{ $post.Date.Format "2006-01-02" }}</time>
       {{ if gt $post.WordCount 0 }}<span class="article-reading-stat">约 {{ $post.WordCount }} 字 · {{ $post.ReadingTime }} 分钟阅读</span>{{ end }}
     </div>
@@ -12,6 +41,17 @@
     {{ with ($post.Summary | default $post.Description) }}
       <p class="article-summary">{{ . | plainify | truncate 90 }}</p>
     {{ end }}
-    {{ with $post.GetTerms "tags" }}<div class="article-tags">{{ range first 3 . }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}
+    <div class="article-footer">
+      {{ with $post.GetTerms "tags" }}
+        <div class="article-tags">
+          {{ range first 2 . }}<a class="tag" href="{{ .RelPermalink }}">#{{ .LinkTitle }}</a>{{ end }}
+        </div>
+      {{ end }}
+      {{ if $isLead }}
+        <a class="article-lead-readmore" href="{{ $post.RelPermalink }}" aria-label="阅读全文：{{ $post.Title }}">
+          <span>阅读全文 →</span>
+        </a>
+      {{ end }}
+    </div>
   </div>
 </article>

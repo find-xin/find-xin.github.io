@@ -951,4 +951,43 @@
       });
     }
   });
+
+  // 20. Post Detail Interactive Like Button
+  function initPostLikeButtons() {
+    const likeButtons = document.querySelectorAll('.post-detail-like-btn');
+    likeButtons.forEach(btn => {
+      const id = btn.dataset.id;
+      if (!id) return;
+      const storageKey = 'post_liked_' + id;
+      const isLiked = localStorage.getItem(storageKey) === 'true';
+      const baseLikes = parseInt(btn.dataset.likes, 10) || 0;
+      const countEl = btn.querySelector('.like-count');
+      const iconEl = btn.querySelector('.heart-icon');
+
+      if (isLiked) {
+        btn.classList.add('is-liked');
+        if (iconEl) iconEl.textContent = '♥';
+        if (countEl) countEl.textContent = baseLikes + 1;
+      }
+
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const likedNow = localStorage.getItem(storageKey) === 'true';
+        if (!likedNow) {
+          localStorage.setItem(storageKey, 'true');
+          btn.classList.add('is-liked', 'animating');
+          if (iconEl) iconEl.textContent = '♥';
+          if (countEl) countEl.textContent = baseLikes + 1;
+        } else {
+          localStorage.removeItem(storageKey);
+          btn.classList.remove('is-liked');
+          if (iconEl) iconEl.textContent = '♡';
+          if (countEl) countEl.textContent = baseLikes;
+        }
+        setTimeout(() => btn.classList.remove('animating'), 300);
+      });
+    });
+  }
+  initPostLikeButtons();
 })();

@@ -58,10 +58,10 @@
     </div>
     <a class="section-more-link" href="{{ "posts/" | relURL }}">全部文章 <span>→</span></a>
   </div>
-  <div class="articles-grid{{ if le (len $posts) 3 }} articles-grid--few{{ end }}">
-    {{ range $index, $post := $posts }}
-      {{ $sizes := slice "large" "medium" "small" "wide" "tall" }}
-      {{ $size := index $sizes (mod $index 5) }}
+  <div class="articles-grid">
+    {{ range $index, $post := first 4 $posts }}
+      {{ $size := "standard" }}
+      {{ if eq $index 0 }}{{ $size = "lead" }}{{ end }}
       {{ partial "mag-card.html" (dict "page" $post "size" $size "priority" (eq $index 0)) }}
     {{ end }}
   </div>
@@ -82,19 +82,39 @@
       <article class="home-diary-card">
         <a class="home-diary-card-link" href="{{ .RelPermalink }}">
           {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
-          {{ with $coverUrl }}
+          {{ if $coverUrl }}
             <div class="home-diary-cover-wrap">
-              <img src="{{ . }}" alt="{{ $.Title }}" loading="lazy">
-              {{ with $.Params.mood }}<span class="diary-badge">{{ . }}</span>{{ else }}{{ with $.Params.weather }}<span class="diary-badge">{{ . }}</span>{{ end }}{{ end }}
+              <img src="{{ $coverUrl }}" alt="{{ $.Title }}" loading="lazy">
+              <div class="diary-badges-row">
+                {{ range (.GetTerms "diary_categories") }}<span class="diary-badge diary-badge-cat">{{ .LinkTitle }}</span>{{ end }}
+                {{ with .Params.mood }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ else }}{{ with .Params.weather }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ end }}{{ end }}
+                {{ if .Params.pinned }}<span class="diary-badge diary-badge-pinned">置顶</span>{{ end }}
+              </div>
+            </div>
+          {{ else }}
+            <div class="home-diary-cover-wrap home-diary-cover-wrap--text">
+              <span class="home-diary-quote-watermark" aria-hidden="true">“</span>
+              <div class="diary-badges-row">
+                {{ range (.GetTerms "diary_categories") }}<span class="diary-badge diary-badge-cat">{{ .LinkTitle }}</span>{{ end }}
+                {{ with .Params.mood }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ else }}{{ with .Params.weather }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ end }}{{ end }}
+                {{ if .Params.pinned }}<span class="diary-badge diary-badge-pinned">置顶</span>{{ end }}
+              </div>
+              <p class="home-diary-quote-snippet">{{ .Summary | default .Plain | truncate 55 }}</p>
             </div>
           {{ end }}
           <div class="home-diary-body">
             <div class="home-diary-meta">
-              <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006年01月02日" }}</time>
+              <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time>
             </div>
             <h3 class="home-diary-title">{{ .Title }}</h3>
             <p class="home-diary-summary">{{ .Summary | plainify | truncate 70 }}</p>
-            <span class="home-diary-readmore">翻开这篇 ↗</span>
+            {{ with .Params.tags }}
+              <div class="diary-card-tags">
+                {{ range first 2 . }}
+                  <span class="diary-card-tag">#{{ . }}</span>
+                {{ end }}
+              </div>
+            {{ end }}
           </div>
         </a>
       </article>
@@ -125,7 +145,6 @@
           <div class="home-gallery-overlay">
             <span class="home-gallery-zoom">🔍 放大欣赏</span>
           </div>
-          <span class="album-card-badge">{{ if eq .category "photography" }}📷 摄影{{ else if eq .category "daily" }}☕ 日常{{ else }}🎨 动漫{{ end }}</span>
         </div>
         <div class="home-gallery-info">
           <span class="home-gallery-caption">{{ .caption }}</span>

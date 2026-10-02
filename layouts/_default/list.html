@@ -1,30 +1,84 @@
 {{ define "main" }}
-<section class="archive-container{{ if eq .Section "search" }} search-page{{ end }}">
+<section class="archive-container shell{{ if eq .Section "search" }} search-page{{ end }}">
   <header class="archive-header">
-    <h1 class="archive-title">
-      {{- if eq .Kind "term" -}}
-        {{- if eq .Data.Singular "category" -}}文章分类 · {{ .Title }}
-        {{- else if eq .Data.Singular "diary_category" -}}日记分类 · {{ .Title }}
-        {{- else if eq .Data.Singular "tag" -}}标签 · #{{ .Title }}
-        {{- else -}}{{ .Title }}
+    <div class="archive-header-top">
+      <div>
+        <p class="archive-eyebrow">
+          {{- if eq .Kind "term" -}}
+            {{- if eq .Data.Singular "category" -}}CATEGORIES · 分类检索
+            {{- else if eq .Data.Singular "diary_category" -}}DIARY CATEGORIES · 日记分类
+            {{- else if eq .Data.Singular "tag" -}}TAGS INDEX · 标签索引
+            {{- else -}}TAXONOMY ARCHIVES · 归档目录
+            {{- end -}}
+          {{- else if eq .Section "search" -}}SEARCH · 站内检索
+          {{- else if or (eq .Title "日记归档") (eq .Section "diary-archive") -}}DAILY ARCHIVES · 日记时间轴
+          {{- else if or (eq .Title "Categories") (eq .Section "categories") -}}CATEGORIES · 文章分类
+          {{- else if or (eq .Title "Diary_categories") (eq .Section "diary_categories") -}}DIARY CATEGORIES · 日记分类
+          {{- else if or (eq .Title "Tags") (eq .Section "tags") -}}TAGS CLOUD · 全站标签
+          {{- else -}}TIMELINE & ARCHIVES · 归档时间轴{{- end -}}
+        </p>
+        <h1 class="archive-title">
+          {{- if eq .Kind "term" -}}
+            {{- if eq .Data.Singular "category" -}}文章分类 · {{ .Title }}
+            {{- else if eq .Data.Singular "diary_category" -}}日记分类 · {{ .Title }}
+            {{- else if eq .Data.Singular "tag" -}}标签 · #{{ .Title }}
+            {{- else -}}{{ .Title }}
+            {{- end -}}
+          {{- else if eq .Section "search" -}}搜索
+          {{- else if or (eq .Title "Posts") (eq .Section "posts") (eq .Section "archive") -}}文章归档
+          {{- else if or (eq .Title "日记归档") (eq .Section "diary-archive") -}}日记归档
+          {{- else if or (eq .Title "Categories") (eq .Section "categories") -}}文章分类
+          {{- else if or (eq .Title "Diary_categories") (eq .Section "diary_categories") -}}日记分类
+          {{- else if or (eq .Title "Tags") (eq .Section "tags") -}}全站标签
+          {{- else -}}{{ .Title }}
+          {{- end -}}
+        </h1>
+        <p class="archive-desc">
+          {{- if eq .Kind "term" -}}
+            {{- if eq .Data.Singular "category" -}}收录于「{{ .Title }}」分类下的所有深度长文。
+            {{- else if eq .Data.Singular "diary_category" -}}收录于「{{ .Title }}」分类下的所有生活日记手记。
+            {{- else if eq .Data.Singular "tag" -}}带有「#{{ .Title }}」标签的全部文章与生活日记。
+            {{- else -}}当前分类目录下的所有内容合集。
+            {{- end -}}
+          {{- else if eq .Section "search" -}}实时检索全站文章、生活日记与光影相册内容。
+          {{- else if or (eq .Title "Posts") (eq .Section "posts") (eq .Section "archive") -}}按时间轴纵览全站文字轨迹，回溯技术实践与思考沉淀。
+          {{- else if or (eq .Title "日记归档") (eq .Section "diary-archive") -}}按时间轴重温日常生活手记，重现生活微光与灵感碎片。
+          {{- else if or (eq .Title "Categories") (eq .Section "categories") -}}系统设计、技术实践与学术思考的主题式聚合索引。
+          {{- else if or (eq .Title "Diary_categories") (eq .Section "diary_categories") -}}生活手记、折腾记录与灵感随想的分类合集。
+          {{- else if or (eq .Title "Tags") (eq .Section "tags") -}}全站交叉标签索引，快速跳转至特定主题内容。
+          {{- else -}}{{ .Description | default "按时间轴回溯全站文字轨迹与创作沉淀。" }}
+          {{- end -}}
+        </p>
+      </div>
+      <div class="archive-stats-badge">
+        {{- if eq .Kind "term" -}}
+          <span>📌 共 {{ len .Pages }} 篇内容</span>
+        {{- else if eq .Section "search" -}}
+          <span>🔍 全文极速索引</span>
+        {{- else if or (eq .Title "日记归档") (eq .Section "diary-archive") -}}
+          <span>📖 共 {{ len (where site.RegularPages "Section" "diary") }} 篇日记</span>
+        {{- else if or (eq .Title "Categories") (eq .Section "categories") -}}
+          <span>📁 共 {{ len site.Taxonomies.categories }} 个分类</span>
+        {{- else if or (eq .Title "Diary_categories") (eq .Section "diary_categories") -}}
+          <span>📖 共 {{ len (index site.Taxonomies "diary_categories") }} 个分类</span>
+        {{- else if or (eq .Title "Tags") (eq .Section "tags") -}}
+          <span>🏷️ 共 {{ len site.Taxonomies.tags }} 个标签</span>
+        {{- else -}}
+          <span>⏳ 共 {{ len (where site.RegularPages "Section" "posts") }} 篇文章</span>
         {{- end -}}
-      {{- else if or (eq .Title "Posts") (eq .Section "posts") (eq .Section "archive") -}}文章归档
-      {{- else if or (eq .Title "日记归档") (eq .Section "diary-archive") -}}日记归档
-      {{- else if or (eq .Title "Categories") (eq .Section "categories") -}}文章分类
-      {{- else if or (eq .Title "Diary_categories") (eq .Section "diary_categories") -}}日记分类
-      {{- else if or (eq .Title "Tags") (eq .Section "tags") -}}所有标签
-      {{- else -}}{{ .Title }}
-      {{- end -}}
-    </h1>
+      </div>
+    </div>
     {{ $isArchiveContext := or (eq .Section "archive") (eq .Section "posts") (eq .Section "diary-archive") (eq .Section "categories") (eq .Section "diary_categories") (eq .Section "tags") (eq .Kind "taxonomy") (eq .Kind "term") }}
     {{ if $isArchiveContext }}
-    <nav class="archive-tabs" aria-label="归档维度">
-      <a class="archive-tab{{ if and (or (eq .Section "archive") (eq .Section "posts")) (ne .Kind "term") }} active{{ end }}" href="{{ "archive/" | relURL }}">文章归档 ({{ len (where site.RegularPages "Section" "posts") }})</a>
-      <a class="archive-tab{{ if and (eq .Section "diary-archive") (ne .Kind "term") }} active{{ end }}" href="{{ "diary-archive/" | relURL }}">日记归档 ({{ len (where site.RegularPages "Section" "diary") }})</a>
-      <a class="archive-tab{{ if or (and (eq .Section "categories") (ne .Kind "term")) (eq .Data.Singular "category") }} active{{ end }}" href="{{ "categories/" | relURL }}">文章分类 ({{ len site.Taxonomies.categories }})</a>
-      <a class="archive-tab{{ if or (and (eq .Section "diary_categories") (ne .Kind "term")) (eq .Data.Singular "diary_category") }} active{{ end }}" href="{{ "diary_categories/" | relURL }}">日记分类 ({{ len (index site.Taxonomies "diary_categories") }})</a>
-      <a class="archive-tab{{ if or (and (eq .Section "tags") (ne .Kind "term")) (eq .Data.Singular "tag") }} active{{ end }}" href="{{ "tags/" | relURL }}">标签 ({{ len site.Taxonomies.tags }})</a>
-    </nav>
+    <div class="archive-toolbar">
+      <nav class="archive-tabs" aria-label="归档维度">
+        <a class="archive-tab{{ if and (or (eq .Section "archive") (eq .Section "posts")) (ne .Kind "term") }} active{{ end }}" href="{{ "archive/" | relURL }}">文章归档 ({{ len (where site.RegularPages "Section" "posts") }})</a>
+        <a class="archive-tab{{ if and (eq .Section "diary-archive") (ne .Kind "term") }} active{{ end }}" href="{{ "diary-archive/" | relURL }}">日记归档 ({{ len (where site.RegularPages "Section" "diary") }})</a>
+        <a class="archive-tab{{ if or (and (eq .Section "categories") (ne .Kind "term")) (eq .Data.Singular "category") }} active{{ end }}" href="{{ "categories/" | relURL }}">文章分类 ({{ len site.Taxonomies.categories }})</a>
+        <a class="archive-tab{{ if or (and (eq .Section "diary_categories") (ne .Kind "term")) (eq .Data.Singular "diary_category") }} active{{ end }}" href="{{ "diary_categories/" | relURL }}">日记分类 ({{ len (index site.Taxonomies "diary_categories") }})</a>
+        <a class="archive-tab{{ if or (and (eq .Section "tags") (ne .Kind "term")) (eq .Data.Singular "tag") }} active{{ end }}" href="{{ "tags/" | relURL }}">全站标签 ({{ len site.Taxonomies.tags }})</a>
+      </nav>
+    </div>
     {{ end }}
   </header>
   {{ if eq .Section "search" }}

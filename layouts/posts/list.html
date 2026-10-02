@@ -7,13 +7,8 @@
         <h1 class="posts-title">{{ .Title }}</h1>
         <p class="posts-desc">{{ .Description | default "记录系统设计、技术实践、读书思考与长篇创作。" }}</p>
       </div>
-      <div class="posts-header-actions">
-        <div class="posts-stats-badge">
-          <span>📝 共 {{ len .Pages }} 篇文章</span>
-        </div>
-        <a class="posts-archive-link" href="{{ "archive/" | relURL }}" title="查看按年份整理的时间轴归档">
-          <span>⌛ 查看时间轴归档 →</span>
-        </a>
+      <div class="posts-stats-badge">
+        <span>📝 共 {{ len .Pages }} 篇文章</span>
       </div>
     </div>
 
@@ -62,18 +57,15 @@
         <div class="posts-card-body">
           <div class="posts-card-meta-top">
             {{ if not $coverUrl }}
-              <div class="posts-card-badges-inline">
-                {{ if .Params.pinned }}<span class="posts-badge posts-badge-pinned">置顶</span>{{ end }}
-                {{ range first 1 (.GetTerms "categories") }}
-                  <a class="posts-card-category-link" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
-                {{ end }}
-              </div>
-            {{ else }}
+              {{ if .Params.pinned }}<span class="posts-badge posts-badge-pinned">置顶</span>{{ end }}
               {{ range first 1 (.GetTerms "categories") }}
                 <a class="posts-card-category-link" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
               {{ end }}
             {{ end }}
             <time class="posts-card-date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time>
+            {{ if gt .WordCount 0 }}
+              <span class="posts-card-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟阅读</span>
+            {{ end }}
           </div>
 
           <h2 class="posts-card-title">
@@ -81,24 +73,18 @@
           </h2>
 
           {{ with (.Summary | default .Description) }}
-            <p class="posts-card-summary">{{ . | plainify | truncate 95 }}</p>
+            <p class="posts-card-summary">{{ . | plainify | truncate 90 }}</p>
           {{ end }}
 
-          <div class="posts-card-footer">
-            <div class="posts-card-tags">
-              {{ if gt .WordCount 0 }}
-                <span class="posts-card-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟</span>
-              {{ end }}
-              {{ with .Params.tags }}
+          {{ with .Params.tags }}
+            <div class="posts-card-footer">
+              <div class="posts-card-tags">
                 {{ range first 2 . }}
                   <span class="posts-card-tag">#{{ . }}</span>
                 {{ end }}
-              {{ end }}
+              </div>
             </div>
-            <a class="posts-card-readmore" href="{{ .RelPermalink }}" aria-label="阅读全文：{{ .Title }}">
-              <span>阅读全文 →</span>
-            </a>
-          </div>
+          {{ end }}
         </div>
       </article>
     {{ end }}

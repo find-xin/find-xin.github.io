@@ -27,7 +27,8 @@
   {{ if .IsHome }}
     {{ with site.Params.heroImage }}<link rel="preload" as="image" href="{{ . | relURL }}" fetchpriority="high">{{ end }}
   {{ else }}
-    {{ with .Params.cover }}<link rel="preload" as="image" href="{{ . | relURL }}" fetchpriority="high">{{ end }}
+    {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
+    {{ with $coverUrl }}<link rel="preload" as="image" href="{{ . }}" fetchpriority="high">{{ end }}
   {{ end }}
 
   <!-- DNS Prefetching for External Services -->
@@ -52,6 +53,7 @@
   {{ $hugo := resources.Get "css/magzine-hugo.css" }}
   {{ $bundle := slice $orig $hugo | resources.Concat "css/theme-bundle.css" | minify | fingerprint }}
   <link rel="stylesheet" href="{{ $bundle.RelPermalink }}" integrity="{{ $bundle.Data.Integrity }}">
+
 
   {{ if eq .Section "diary" }}
   {{ $diaryCSS := resources.Get "css/diary.css" | minify | fingerprint }}<link rel="stylesheet" href="{{ $diaryCSS.RelPermalink }}" integrity="{{ $diaryCSS.Data.Integrity }}">

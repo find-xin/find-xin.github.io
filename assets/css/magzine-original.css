@@ -632,10 +632,6 @@ p {
   position: relative;
   overflow: hidden;
   flex: 7;
-  /* 使用flex比例来控制图片区域占比 */
-  /* 新增：手动添加圆角，替代父级 overflow: hidden 的效果 */
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
 }
 
 /* 大卡片的图片样式 - 保持7:3的占比 */
