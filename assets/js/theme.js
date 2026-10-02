@@ -255,13 +255,16 @@
     }
   }
 
-  // 8. Spotlight Command Palette Search Modal
   const spotlightModal = document.getElementById('spotlight-modal');
   const spotlightInput = document.getElementById('spotlight-input');
   const spotlightResults = document.getElementById('spotlight-results');
   const spotlightStatus = document.getElementById('spotlight-status');
+  const spotlightBody = document.querySelector('.spotlight-body');
   let searchDocuments = null;
   let activeIndex = -1;
+  let isKeyboardNavigating = false;
+  let lastMouseX = -1;
+  let lastMouseY = -1;
 
   const escapeHTML = (str) => {
     return (str || '').replace(/[&<>'"]/g, tag => ({
@@ -293,6 +296,9 @@
     spotlightModal.classList.add('is-open');
     spotlightModal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('is-modal-open');
+    isKeyboardNavigating = false;
+    lastMouseX = -1;
+    lastMouseY = -1;
     if (spotlightInput) {
       spotlightInput.value = '';
       spotlightInput.focus();
@@ -319,16 +325,35 @@
     spotlightModal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('is-modal-open');
     activeIndex = -1;
+    isKeyboardNavigating = false;
+  };
+
+  const scrollToActiveItem = (item) => {
+    if (!item) return;
+    const body = spotlightBody || document.querySelector('.spotlight-body');
+    if (!body) return;
+
+    const bodyRect = body.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+
+    if (itemRect.top < bodyRect.top) {
+      body.scrollTop -= (bodyRect.top - itemRect.top + 6);
+    } else if (itemRect.bottom > bodyRect.bottom) {
+      body.scrollTop += (itemRect.bottom - bodyRect.bottom + 6);
+    }
   };
 
   const updateActiveItem = (items) => {
-    items.forEach((item, idx) => {
-      const isTarget = idx === activeIndex;
-      item.classList.toggle('is-active', isTarget);
-      if (isTarget) {
-        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }
-    });
+    if (!items || items.length === 0) return;
+    const currentActive = spotlightResults ? spotlightResults.querySelector('.spotlight-item.is-active') : null;
+    if (currentActive) {
+      currentActive.classList.remove('is-active');
+    }
+    const targetItem = items[activeIndex];
+    if (targetItem) {
+      targetItem.classList.add('is-active');
+      scrollToActiveItem(targetItem);
+    }
   };
 
   const performSearch = (query) => {
@@ -363,6 +388,9 @@
     }
 
     activeIndex = 0;
+    const body = spotlightBody || document.querySelector('.spotlight-body');
+    if (body) body.scrollTop = 0;
+
     spotlightResults.innerHTML = matches.map((item, idx) => {
       const isDiary = item.section === 'diary';
       const isGallery = item.section === 'gallery';
@@ -383,7 +411,9 @@
 
     spotlightResults.querySelectorAll('.spotlight-item').forEach(el => {
       el.addEventListener('mouseenter', () => {
-        spotlightResults.querySelectorAll('.spotlight-item').forEach(i => i.classList.remove('is-active'));
+        if (isKeyboardNavigating) return;
+        const currentActive = spotlightResults.querySelector('.spotlight-item.is-active');
+        if (currentActive) currentActive.classList.remove('is-active');
         el.classList.add('is-active');
         activeIndex = parseInt(el.dataset.index, 10);
       });
@@ -462,6 +492,7 @@
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
+        isKeyboardNavigating = true;
         if (activeIndex < 0) {
           activeIndex = 0;
           updateActiveItem(items);
@@ -475,6 +506,7 @@
         }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
+        isKeyboardNavigating = true;
         if (activeIndex < 0) {
           activeIndex = 0;
           updateActiveItem(items);
@@ -490,6 +522,30 @@
         e.preventDefault();
         if (activeIndex >= 0 && items[activeIndex]) {
           window.location.href = items[activeIndex].href;
+        }
+      }
+    });
+  }
+
+  if (spotlightModal) {
+    spotlightModal.addEventListener('mousemove', (e) => {
+      if (lastMouseX === -1 && lastMouseY === -1) {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        return;
+      }
+      if (Math.abs(e.clientX - lastMouseX) > 2 || Math.abs(e.clientY - lastMouseY) > 2) {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        if (isKeyboardNavigating) {
+          isKeyboardNavigating = false;
+          const item = e.target.closest('.spotlight-item');
+          if (item && spotlightResults) {
+            const currentActive = spotlightResults.querySelector('.spotlight-item.is-active');
+            if (currentActive) currentActive.classList.remove('is-active');
+            item.classList.add('is-active');
+            activeIndex = parseInt(item.dataset.index, 10);
+          }
         }
       }
     });

@@ -3033,6 +3033,7 @@ body.dark-mode .spotlight-kbd {
 .spotlight-body {
   flex: 1;
   overflow-y: auto;
+  scroll-behavior: auto;
   padding: 12px;
   max-height: 440px;
 }
@@ -3064,7 +3065,7 @@ body.dark-mode .spotlight-kbd {
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
-  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: background-color 0.1s ease, border-color 0.1s ease, transform 0.1s ease;
   border: 1px solid transparent;
 }
 
