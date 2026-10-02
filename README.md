@@ -262,12 +262,30 @@ python3 scripts/publish_obsidian.py "/path/to/note.md" \
   --tags "AI,PyTorch,深度学习"
 ```
 
+##### 4. 下架、重新上架、删除与管理已有文章
+脚本不仅支持发布，还支持全站文章的一键维护：
+```bash
+# 查看全站所有博文与日记的发布状态（🟢 正常 / 🟡 已下架草稿）
+python3 scripts/publish_obsidian.py --list
+
+# 下架指定文章（转为草稿 draft: true，支持按标题或文件夹别名匹配）
+python3 scripts/publish_obsidian.py --unpublish "久远寺有珠"
+
+# 重新上架指定文章（恢复 draft: false）
+python3 scripts/publish_obsidian.py --publish "久远寺有珠"
+
+# 彻底删除指定文章及其关联附件目录
+python3 scripts/publish_obsidian.py --delete "久远寺有珠"
+```
+
 ##### 脚本自动为你完成的工作：
+- 🖼️ **图片自动转换为 WebP**：自动调用系统 `cwebp` 工具将引用的 `.png`、`.jpg`、`.jpeg` 图片统一转换为体积小、画质高、加载极速的 `.webp` 格式，并自动更新 Markdown 中的引用链接与封面图路径。
 - 🔍 **双链语法自动转换**：
-  - 将 Obsidian 图片双链 `![[Pasted image.png]]` 或 `![[attachments/photo.png]]` 自动转换为 Hugo 标准语法 `![说明](attachments/photo.png)`。
+  - 将 Obsidian 图片双链 `![[Pasted image.png]]` 或 `![[attachments/photo.png]]` 自动转换为 Hugo 标准语法 `![说明](attachments/photo.webp)`。
   - 将文档双链 `![[attachments/paper.pdf]]` 自动转换为 `[📄 查看文档 paper.pdf](attachments/paper.pdf)`。
   - 自动剥离 `[[内部笔记|别名]]` 为纯文本。
 - 🛡️ **文件名安全净化**：自动将含空格或特殊符号的附件文件名（如 `Pasted image 20261002.png`）转为安全的 Web 文件名，防止网络 404。
+- 📐 **排版与公式保障**：自动检测数学公式并开启 KaTeX 支持；开启 `hardWraps: true` 保证 Obsidian 换行与博客完全一致；添加 `hideCover: true` 避免正文图片与文章顶部 Banner 封面重复展示。
 - 📦 **附件精准提取与复制**：仅复制本篇笔记实际引用的图片与 PDF 到对应的 `attachments/` 目录中。
 - 📝 **智能 Front Matter 生成**：自动提取首行 `# 标题` 作为 `title`，提取修改时间作为 `date`，设置 `draft: false`，并将第一张照片自动设为文章封面。
 

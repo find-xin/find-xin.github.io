@@ -1,5 +1,6 @@
-<article class="post-entry{{ if not .Params.cover }} without-cover{{ end }}">
-  {{ with .Params.cover }}<a class="entry-art" href="{{ $.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" loading="lazy"></a>{{ end }}
+{{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
+<article class="post-entry{{ if not $coverUrl }} without-cover{{ end }}">
+  {{ with $coverUrl }}<a class="entry-art" href="{{ $.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . }}" alt="" loading="lazy"></a>{{ end }}
   <div class="entry-copy">
     <div class="post-meta"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006.01.02" }}</time>{{ range .GetTerms "categories" }}<a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}{{ if .Params.pinned }}<span class="pinned-label">置顶</span>{{ end }}</div>
     <h2><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>

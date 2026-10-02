@@ -43,6 +43,7 @@ enableRobotsTXT = true
 
 [markup.goldmark.renderer]
   unsafe = false
+  hardWraps = true
 
 [markup.tableOfContents]
   startLevel = 1

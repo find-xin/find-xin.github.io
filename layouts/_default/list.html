@@ -32,12 +32,13 @@
               <div class="archive-post">
                 <time class="archive-date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "01-02" }}</time>
                 <span class="archive-post-marker" aria-hidden="true"></span>
-                <article class="archive-post-card{{ if .Params.cover }} has-cover{{ end }}">
+                {{ $coverUrl := partial "image-url.html" (dict "context" $post "src" .Params.cover) }}
+                <article class="archive-post-card{{ if $coverUrl }} has-cover{{ end }}">
                   <div class="archive-post-copy">
                     <h2 class="archive-post-title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
                     <div class="archive-meta">{{ range .GetTerms "categories" }}<a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}{{ range first 3 (.GetTerms "tags") }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>
                   </div>
-                  {{ with .Params.cover }}<a class="archive-post-cover" href="{{ $post.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" loading="lazy"></a>{{ end }}
+                  {{ with $coverUrl }}<a class="archive-post-cover" href="{{ $post.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . }}" alt="" loading="lazy"></a>{{ end }}
                 </article>
               </div>
             {{ end }}
