@@ -1,27 +1,3 @@
 # ==============================================================================
 # 资料库资源列表 (Resources Data)
 # ==============================================================================
-
-- id: "res-starter-guide"
-  title: "有珠之夜 · 博客极速上手与配置指南"
-  filename: "youshu-blog-guide.pdf"
-  url: "/resources/youshu-blog-guide.pdf"
-  category: "docs"
-  format: "pdf"
-  size: "25 KB"
-  file_count: 1
-  date: "2026-10-02"
-  description: "全面涵盖 Obsidian 语法、Jupyter Notebook 转换、相册管理与控制台运维的详尽开发使用手册。"
-  tags: ["指南", "Obsidian", "Hugo", "文档"]
-
-- id: "res-starter-kit"
-  title: "个人常用效率工具与配置文件合集"
-  filename: "developer-starter-pack.zip"
-  url: "/resources/developer-starter-pack.zip"
-  category: "archives"
-  format: "zip"
-  size: "1 KB"
-  file_count: 3
-  date: "2026-10-02"
-  description: "整理打包的常用命令行脚本、VS Code 配置片段、样式模板与工具预设压缩包。"
-  tags: ["工具包", "配置文件", "脚本", "效率"]
