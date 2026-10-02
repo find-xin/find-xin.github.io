@@ -225,12 +225,29 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
         out_fm.append(f"tags: {cur_tags}")
         out_fm.append(f"likes: {fm.get('likes', 5)}")
     else:
-        summary = fm.get('summary') or (re.sub(r'[#*`!\[\]\(\)]', '', new_body.strip()).split('\n')[0][:80] if new_body else '')
+        # 智能提取摘要：跳过图片与空行，提取首段纯文字
+        summary = fm.get('summary')
+        if not summary:
+            clean_text = re.sub(r'!\[.*?\]\(.*?\)', '', new_body)
+            clean_text = re.sub(r'<[^>]+>', '', clean_text)
+            clean_text = re.sub(r'\[.*?\]\(.*?\)', '', clean_text)
+            clean_text = re.sub(r'[#*`$\\]', '', clean_text)
+            for line in clean_text.splitlines():
+                line = line.strip()
+                if line and len(line) >= 2:
+                    summary = line[:80].replace("'", "")
+                    break
         if summary:
             out_fm.append(f"summary: '{summary}'")
         if final_cover:
             out_fm.append(f"cover: '{final_cover}'")
+            # 若正文中已包含该图片，隐藏文章顶部冗余的 400px 裁切横幅，保持 Obsidian 原生自然排版
+            if final_cover in new_body or 'attachments/' in new_body:
+                out_fm.append("hideCover: true")
         out_fm.append("pinned: false")
+
+        if '$' in new_body:
+            out_fm.append("math: true")
         
         cur_cat = category or fm.get('categories') or '随笔'
         if isinstance(cur_cat, str):

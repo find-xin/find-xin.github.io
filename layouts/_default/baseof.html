@@ -60,10 +60,28 @@
   {{ $themeJS := resources.Get "js/theme.js" | minify | fingerprint }}<script src="{{ $themeJS.RelPermalink }}" integrity="{{ $themeJS.Data.Integrity }}" defer></script>
 
   <!-- On-Demand KaTeX Math Formulas -->
-  {{ if or .Params.math site.Params.math }}
+  {{ if or .Params.math site.Params.math (findRE "\\$[^\\$]+\\$" .RawContent) }}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false});"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      function tryRender() {
+        if (window.renderMathInElement) {
+          renderMathInElement(document.body, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+          });
+        } else {
+          setTimeout(tryRender, 60);
+        }
+      }
+      tryRender();
+    });
+  </script>
   {{ end }}
 
   <!-- Speculation Rules for Instant Navigation -->

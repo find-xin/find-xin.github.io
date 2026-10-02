@@ -15,6 +15,7 @@ title = 'find-xin 的博客'
   author = 'find-xin'
   avatar = '/images/avatar-github.jpg'
   githubURL = 'https://github.com/find-xin'
+  math = true
 
 [taxonomies]
   tag = 'tags'
