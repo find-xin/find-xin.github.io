@@ -38,7 +38,8 @@
       {{ $postID := .File.UniqueID | default .RelPermalink }}
       {{ $tagString := delimit (.Params.tags | default slice) "," }}
       <article class="diary-card" data-tags="{{ $tagString }}" data-id="{{ $postID }}">
-        {{ if .Params.cover }}
+        {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
+        {{ if $coverUrl }}
           <div class="diary-card-cover">
             <div class="diary-badges-row">
               {{ with .Params.mood }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ else }}{{ with .Params.weather }}<span class="diary-badge diary-badge-mood">{{ . }}</span>{{ end }}{{ end }}
@@ -46,7 +47,7 @@
               {{ with .Params.photos }}<span class="diary-badge diary-badge-photos">📷 {{ len . }}</span>{{ end }}
             </div>
             <a href="{{ .RelPermalink }}" tabindex="-1" aria-hidden="true">
-              <img src="{{ .Params.cover | relURL }}" alt="{{ .Title }}" loading="lazy" {{ with .Params.coverRatio }}style="aspect-ratio: {{ . | safeCSS }};"{{ end }}>
+              <img src="{{ $coverUrl }}" alt="{{ .Title }}" loading="lazy" {{ with .Params.coverRatio }}style="aspect-ratio: {{ . | safeCSS }};"{{ end }}>
             </a>
           </div>
         {{ else }}

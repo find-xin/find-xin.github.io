@@ -1,0 +1,29 @@
+{{/* 
+  辅助函数：获取图片的正确相对/绝对链接
+  支持三种形式：
+  1. 绝对网络链接：http:// 或 https://
+  2. 根目录静态资源：/images/posts/xxx.webp
+  3. Page Bundle 叶子包资源：attachments/pic.png 或 pic.png
+*/}}
+{{ $src := .src }}
+{{ $page := .context }}
+{{ $finalUrl := "" }}
+{{ if $src }}
+  {{ if or (hasPrefix $src "http://") (hasPrefix $src "https://") }}
+    {{ $finalUrl = $src }}
+  {{ else if hasPrefix $src "/" }}
+    {{ $finalUrl = $src | relURL }}
+  {{ else }}
+    {{/* 尝试匹配当前页面内部资源 */}}
+    {{ $res := $page.Resources.GetMatch $src }}
+    {{ if not $res }}
+      {{ $res = $page.Resources.GetMatch (printf "*%s*" $src) }}
+    {{ end }}
+    {{ if $res }}
+      {{ $finalUrl = $res.RelPermalink }}
+    {{ else }}
+      {{ $finalUrl = printf "%s%s" $page.RelPermalink $src }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+{{ return $finalUrl }}

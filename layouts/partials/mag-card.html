@@ -1,6 +1,7 @@
 {{ $post := .page }}
-<article class="article-card article-card--{{ .size }}{{ if not $post.Params.cover }} article-card--text{{ end }}">
-  {{ with $post.Params.cover }}<div class="article-image"><a href="{{ $post.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" {{ if $.priority }}fetchpriority="high"{{ else }}loading="lazy"{{ end }}></a></div>{{ end }}
+{{ $coverUrl := partial "image-url.html" (dict "context" $post "src" $post.Params.cover) }}
+<article class="article-card article-card--{{ .size }}{{ if not $coverUrl }} article-card--text{{ end }}">
+  {{ with $coverUrl }}<div class="article-image"><a href="{{ $post.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . }}" alt="" {{ if $.priority }}fetchpriority="high"{{ else }}loading="lazy"{{ end }}></a></div>{{ end }}
   <div class="article-content">
     <div class="article-meta">
       {{ if $post.Params.pinned }}<span class="article-sticky">置顶</span>{{ end }}

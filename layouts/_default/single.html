@@ -10,7 +10,8 @@
   </details>
   {{ end }}
   <header class="post-header">
-    {{ with .Params.cover }}<figure class="post-cover"><img src="{{ . | relURL }}" alt="{{ $.Title }}配图" fetchpriority="high"></figure>{{ end }}
+    {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
+    {{ with $coverUrl }}<figure class="post-cover"><img src="{{ . }}" alt="{{ $.Title }}配图" fetchpriority="high"></figure>{{ end }}
     <div class="post-meta">{{ range first 1 (.GetTerms "categories") }}<span class="post-category"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></span>{{ end }}<time class="post-date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time><span class="post-author">{{ site.Params.author }}</span>{{ if gt .WordCount 0 }}<span class="post-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟阅读</span>{{ end }}</div>
     <h1 class="post-title">{{ .Title }}</h1>
     {{ with .GetTerms "tags" }}<div class="post-tags">{{ range . }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}

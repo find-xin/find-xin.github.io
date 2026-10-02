@@ -29,9 +29,10 @@
       {{ end }}
     </header>
 
-    {{ with .Params.cover }}
+    {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
+    {{ with $coverUrl }}
       <figure class="diary-detail-cover">
-        <img src="{{ . | relURL }}" alt="{{ $.Title }}" fetchpriority="high">
+        <img src="{{ . }}" alt="{{ $.Title }}" fetchpriority="high">
       </figure>
     {{ end }}
 

@@ -81,9 +81,10 @@
     {{ range first 3 $diaries }}
       <article class="home-diary-card">
         <a class="home-diary-card-link" href="{{ .RelPermalink }}">
-          {{ with .Params.cover }}
+          {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
+          {{ with $coverUrl }}
             <div class="home-diary-cover-wrap">
-              <img src="{{ . | relURL }}" alt="{{ $.Title }}" loading="lazy">
+              <img src="{{ . }}" alt="{{ $.Title }}" loading="lazy">
               {{ with $.Params.mood }}<span class="diary-badge">{{ . }}</span>{{ else }}{{ with $.Params.weather }}<span class="diary-badge">{{ . }}</span>{{ end }}{{ end }}
             </div>
           {{ end }}

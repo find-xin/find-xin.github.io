@@ -15,6 +15,7 @@
   - [2.3 插入图片与撰写「带图 Markdown」](#23-插入图片与撰写带图-markdown)
   - [2.4 上传与嵌入 PDF 文档](#24-上传与嵌入-pdf-文档)
   - [2.5 管理多分区相册（摄影 / 日常 / 动漫）](#25-管理多分区相册摄影--日常--动漫)
+  - [2.6 从 Obsidian 发布文章与日记（带 attachments 附件）](#26-从-obsidian-发布文章与日记带-attachments-附件)
 - [3. 本地调试与上传 GitHub 操作流程（必读命令）](#3-本地调试与上传-github-操作流程必读命令)
 - [4. 常见问题与避坑提示](#4-常见问题与避坑提示)
 
@@ -220,6 +221,74 @@ static/docs/your-document-name.pdf
 ```
 
 保存后，相册页面及首页下方的「光影切片」都会自动加载该照片并支持标签筛选！
+
+---
+
+### 2.6 从 Obsidian 发布文章与日记（带 attachments 附件）
+
+在 Obsidian 中写文章通常会将图片与 PDF 等文件放在同级目录下的 `attachments/` 文件夹中。Hugo 提供了 **页面包（Page Bundle）** 架构，每个文章或日记都可以作为一个独立的文件夹，完美契合 Obsidian 的组织形式：
+
+```text
+content/posts/my-note/
+├── index.md           # 笔记正文
+└── attachments/       # 该文章引用的图片、PDF 文档等附件
+    ├── image-1.png
+    └── document.pdf
+```
+
+当浏览器访问 `/posts/my-note/` 时，正文中的相对路径 `attachments/image-1.png` 以及封面 `cover: 'attachments/image-1.png'` 均可自动解析并正常显示。
+
+为了避免手动修改双链语法、手动重命名空格文件名和搬运文件的繁琐工作，本项目已内置**全自动发布脚本**：
+
+#### 方案一：使用内置一键自动化脚本（强烈推荐 🌟）
+
+项目根目录下提供了专属脚本 `scripts/publish_obsidian.py`，无需安装任何额外 Python 依赖包即可直接运行：
+
+##### 1. 发布为长篇博文（Post）
+```bash
+python3 scripts/publish_obsidian.py "/Users/xin/Documents/Obsidian/你的笔记.md"
+```
+
+##### 2. 发布为生活日记（Diary）
+```bash
+python3 scripts/publish_obsidian.py "/Users/xin/Documents/Obsidian/今日随笔.md" --type diary
+```
+
+##### 3. 自定义别名、分类与标签
+```bash
+python3 scripts/publish_obsidian.py "/path/to/note.md" \
+  --slug deep-learning \
+  --category "技术" \
+  --tags "AI,PyTorch,深度学习"
+```
+
+##### 脚本自动为你完成的工作：
+- 🔍 **双链语法自动转换**：
+  - 将 Obsidian 图片双链 `![[Pasted image.png]]` 或 `![[attachments/photo.png]]` 自动转换为 Hugo 标准语法 `![说明](attachments/photo.png)`。
+  - 将文档双链 `![[attachments/paper.pdf]]` 自动转换为 `[📄 查看文档 paper.pdf](attachments/paper.pdf)`。
+  - 自动剥离 `[[内部笔记|别名]]` 为纯文本。
+- 🛡️ **文件名安全净化**：自动将含空格或特殊符号的附件文件名（如 `Pasted image 20261002.png`）转为安全的 Web 文件名，防止网络 404。
+- 📦 **附件精准提取与复制**：仅复制本篇笔记实际引用的图片与 PDF 到对应的 `attachments/` 目录中。
+- 📝 **智能 Front Matter 生成**：自动提取首行 `# 标题` 作为 `title`，提取修改时间作为 `date`，设置 `draft: false`，并将第一张照片自动设为文章封面。
+
+---
+
+#### 方案二：纯手动整理方式（零脚本）
+
+如果你习惯手动整理文件：
+
+1. **调整 Obsidian 设置（生成标准 Markdown 链接）**：
+   - 打开 Obsidian「设置」→「文件与链接 (Files & links)」：
+     - 将「使用 [[WikiLinks]]」开关 **关闭**。
+     - 将「内部链接类型」更改为 **相对于当前文件的相对路径**。
+   - 这样 Obsidian 插入图片时就会自动生成标准的 `![描述](attachments/xxx.png)` 语法。
+2. **复制到博客目录**：
+   - 在 `content/posts/` 或 `content/diary/` 下新建一个英文文件夹（例如 `content/posts/autumn-walk/`）。
+   - 将笔记重命名为 `index.md` 放入该文件夹。
+   - 将该笔记对应的 `attachments/` 文件夹整体复制到该文件夹中。
+3. **补充 Front Matter**：
+   - 在 `index.md` 顶部加上两行 `---`，配置 `title`、`date`、`draft: false` 等参数。
+   - 封面可直接填写：`cover: 'attachments/your-cover.png'`。
 
 ---
 
