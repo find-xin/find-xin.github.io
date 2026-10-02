@@ -1,14 +1,275 @@
 {{ define "main" }}
-<section class="gallery-page shell">
-  <a class="back-link" href="{{ site.Home.RelPermalink }}">← 返回博客首页</a>
-  <header class="page-heading"><div><p class="eyebrow">画面收藏</p><h1>{{ .Title }}</h1></div><p class="heading-note">把喜欢的画面留下，<br>让故事在此多停一会儿。</p></header>
-  <div class="gallery-toolbar"><span>{{ len hugo.Data.gallery.images }} 幅收藏</span><span>点击画作，展开欣赏 <span aria-hidden="true">↗</span></span></div>
-  <div class="gallery-grid">
-    {{ range sort hugo.Data.gallery.images "number" "desc" }}
-    <figure class="gallery-item" id="art-{{ .number }}"><a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "收藏 %v" .number) }}"><img src="{{ .image | relURL }}" alt="{{ .caption | default (printf "型月收藏 %v" .number) }}" style="aspect-ratio: {{ .ratio }}" loading="lazy"></a><figcaption>{{ with .caption }}<span>{{ . }}</span>{{ end }}<small>#{{ .number }}</small></figcaption></figure>
+{{ $allImages := hugo.Data.gallery.images }}
+{{ $photographyImages := where $allImages "category" "photography" }}
+{{ $dailyImages := where $allImages "category" "daily" }}
+{{ $animeImages := where $allImages "category" "anime" }}
+
+<section class="album-page shell">
+  <!-- 头部：与日记/归档保持统一的杂志风规范，移除多余的返回首页按钮 -->
+  <header class="album-header">
+    <div class="album-header-top">
+      <div>
+        <p class="album-eyebrow">PHOTO ALBUMS · 光影相册</p>
+        <h1 class="album-title">{{ .Title }}</h1>
+        <p class="album-desc">{{ .Description | default "记录镜头里的光影、生活里的切片，与静谧夜晚的二次元世界。" }}</p>
+      </div>
+      <div class="album-stats-badge">
+        <span>🖼️ 共 {{ len $allImages }} 幅作品 · 3 个主题</span>
+      </div>
+    </div>
+
+    <!-- 顶部分类导航（与日记分类规范统一） -->
+    <div class="album-toolbar">
+      <div class="album-filter-tabs" role="tablist" aria-label="相册分类切换">
+        <button class="album-filter-tab active" type="button" data-cat="all">
+          <span>✨ 全部作品</span>
+          <span class="tab-count">{{ len $allImages }}</span>
+        </button>
+        <button class="album-filter-tab" type="button" data-cat="photography">
+          <span>📷 摄影</span>
+          <span class="tab-count">{{ len $photographyImages }}</span>
+        </button>
+        <button class="album-filter-tab" type="button" data-cat="daily">
+          <span>☕ 日常</span>
+          <span class="tab-count">{{ len $dailyImages }}</span>
+        </button>
+        <button class="album-filter-tab" type="button" data-cat="anime">
+          <span>🎨 动漫</span>
+          <span class="tab-count">{{ len $animeImages }}</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 三个核心版块 -->
+  <div class="album-sections">
+
+    <!-- 1. 摄影相册 -->
+    {{ $photoTags := slice }}
+    {{ range $photographyImages }}
+      {{ range .tags }}
+        {{ if not (in $photoTags .) }}{{ $photoTags = $photoTags | append . }}{{ end }}
+      {{ end }}
     {{ end }}
+    <section class="album-section" id="section-photography" data-category="photography">
+      <div class="album-section-header">
+        <div class="album-section-meta">
+          <div class="section-pre-title">
+            <span class="section-index">01</span>
+            <span class="section-divider">/</span>
+            <span class="section-en">PHOTOGRAPHY</span>
+          </div>
+          <h2 class="album-section-title">
+            <span class="section-emoji">📷</span>
+            <span>摄影相册</span>
+            <span class="album-section-qty">({{ len $photographyImages }})</span>
+          </h2>
+          <p class="album-section-desc">捕捉光线与空间的交织，定格城市、自然与街角的故事。</p>
+        </div>
+
+        <div class="album-tags-bar" data-category="photography">
+          <span class="tags-bar-label">标签:</span>
+          <div class="tags-bar-scroll">
+            <button class="tag tag-filter-btn active" type="button" data-tag="all">全部</button>
+            {{ range $photoTags }}
+              <button class="tag tag-filter-btn" type="button" data-tag="{{ . }}">#{{ . }}</button>
+            {{ end }}
+          </div>
+        </div>
+      </div>
+
+      <div class="album-grid" data-category="photography">
+        {{ range $photographyImages }}
+          {{ $tagsStr := delimit .tags " " }}
+          <figure class="album-card" id="album-{{ .number }}" data-category="photography" data-tags="{{ $tagsStr }}">
+            <div class="album-card-media">
+              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "摄影 %v" .number) }}" data-category="摄影" data-tags="{{ delimit .tags " · " }}">
+                <img src="{{ .image | relURL }}" alt="{{ .caption }}" style="aspect-ratio: {{ .ratio }}" loading="lazy">
+                <div class="album-card-overlay">
+                  <span class="album-view-icon">🔍 放大欣赏</span>
+                </div>
+              </a>
+              <span class="album-card-badge">📷 摄影</span>
+            </div>
+            <figcaption class="album-card-info">
+              <div class="album-card-title-row">
+                <span class="album-card-caption">{{ .caption }}</span>
+                <span class="album-card-num">#{{ .number }}</span>
+              </div>
+              {{ with .tags }}
+                <div class="album-card-tags">
+                  {{ range . }}
+                    <button class="tag album-card-tag" type="button" data-tag="{{ . }}" title="筛选 #{{ . }}">#{{ . }}</button>
+                  {{ end }}
+                </div>
+              {{ end }}
+            </figcaption>
+          </figure>
+        {{ end }}
+      </div>
+      <div class="album-empty-msg" style="display: none;">🍃 该标签下暂无匹配照片</div>
+    </section>
+
+    <!-- 2. 日常相册 -->
+    {{ $dailyTags := slice }}
+    {{ range $dailyImages }}
+      {{ range .tags }}
+        {{ if not (in $dailyTags .) }}{{ $dailyTags = $dailyTags | append . }}{{ end }}
+      {{ end }}
+    {{ end }}
+    <section class="album-section" id="section-daily" data-category="daily">
+      <div class="album-section-header">
+        <div class="album-section-meta">
+          <div class="section-pre-title">
+            <span class="section-index">02</span>
+            <span class="section-divider">/</span>
+            <span class="section-en">DAILY LIFE</span>
+          </div>
+          <h2 class="album-section-title">
+            <span class="section-emoji">☕</span>
+            <span>日常相册</span>
+            <span class="album-section-qty">({{ len $dailyImages }})</span>
+          </h2>
+          <p class="album-section-desc">一杯咖啡的温度、几行翻阅的闲书，以及生活里的温存碎片。</p>
+        </div>
+
+        <div class="album-tags-bar" data-category="daily">
+          <span class="tags-bar-label">标签:</span>
+          <div class="tags-bar-scroll">
+            <button class="tag tag-filter-btn active" type="button" data-tag="all">全部</button>
+            {{ range $dailyTags }}
+              <button class="tag tag-filter-btn" type="button" data-tag="{{ . }}">#{{ . }}</button>
+            {{ end }}
+          </div>
+        </div>
+      </div>
+
+      <div class="album-grid" data-category="daily">
+        {{ range $dailyImages }}
+          {{ $tagsStr := delimit .tags " " }}
+          <figure class="album-card" id="album-{{ .number }}" data-category="daily" data-tags="{{ $tagsStr }}">
+            <div class="album-card-media">
+              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "日常 %v" .number) }}" data-category="日常" data-tags="{{ delimit .tags " · " }}">
+                <img src="{{ .image | relURL }}" alt="{{ .caption }}" style="aspect-ratio: {{ .ratio }}" loading="lazy">
+                <div class="album-card-overlay">
+                  <span class="album-view-icon">🔍 放大欣赏</span>
+                </div>
+              </a>
+              <span class="album-card-badge">☕ 日常</span>
+            </div>
+            <figcaption class="album-card-info">
+              <div class="album-card-title-row">
+                <span class="album-card-caption">{{ .caption }}</span>
+                <span class="album-card-num">#{{ .number }}</span>
+              </div>
+              {{ with .tags }}
+                <div class="album-card-tags">
+                  {{ range . }}
+                    <button class="tag album-card-tag" type="button" data-tag="{{ . }}" title="筛选 #{{ . }}">#{{ . }}</button>
+                  {{ end }}
+                </div>
+              {{ end }}
+            </figcaption>
+          </figure>
+        {{ end }}
+      </div>
+      <div class="album-empty-msg" style="display: none;">🍃 该标签下暂无匹配照片</div>
+    </section>
+
+    <!-- 3. 动漫相册 (包含所有型月原画与收藏) -->
+    {{ $animeTags := slice }}
+    {{ range $animeImages }}
+      {{ range .tags }}
+        {{ if not (in $animeTags .) }}{{ $animeTags = $animeTags | append . }}{{ end }}
+      {{ end }}
+    {{ end }}
+    <section class="album-section" id="section-anime" data-category="anime">
+      <div class="album-section-header">
+        <div class="album-section-meta">
+          <div class="section-pre-title">
+            <span class="section-index">03</span>
+            <span class="section-divider">/</span>
+            <span class="section-en">ANIME & TYPE-MOON</span>
+          </div>
+          <h2 class="album-section-title">
+            <span class="section-emoji">🎨</span>
+            <span>动漫相册</span>
+            <span class="album-section-qty">({{ len $animeImages }})</span>
+          </h2>
+          <p class="album-section-desc">《魔法使之夜》苍崎青子与久远寺有珠、型月世界插画与壁纸典藏。</p>
+        </div>
+
+        <div class="album-tags-bar" data-category="anime">
+          <span class="tags-bar-label">标签:</span>
+          <div class="tags-bar-scroll">
+            <button class="tag tag-filter-btn active" type="button" data-tag="all">全部</button>
+            {{ range $animeTags }}
+              <button class="tag tag-filter-btn" type="button" data-tag="{{ . }}">#{{ . }}</button>
+            {{ end }}
+          </div>
+        </div>
+      </div>
+
+      <div class="album-grid" data-category="anime">
+        {{ range sort $animeImages "number" "desc" }}
+          {{ $tagsStr := delimit .tags " " }}
+          <figure class="album-card" id="album-{{ .number }}" data-category="anime" data-tags="{{ $tagsStr }}">
+            <div class="album-card-media">
+              <a class="gallery-open" href="{{ .original | default .image | relURL }}" data-image="{{ .image | relURL }}" data-caption="{{ .caption | default (printf "动漫收藏 %v" .number) }}" data-category="动漫" data-tags="{{ delimit .tags " · " }}">
+                <img src="{{ .image | relURL }}" alt="{{ .caption }}" style="aspect-ratio: {{ .ratio }}" loading="lazy">
+                <div class="album-card-overlay">
+                  <span class="album-view-icon">🔍 放大欣赏</span>
+                </div>
+              </a>
+              <span class="album-card-badge">🎨 动漫</span>
+            </div>
+            <figcaption class="album-card-info">
+              <div class="album-card-title-row">
+                <span class="album-card-caption">{{ .caption }}</span>
+                <span class="album-card-num">#{{ .number }}</span>
+              </div>
+              {{ with .tags }}
+                <div class="album-card-tags">
+                  {{ range . }}
+                    <button class="tag album-card-tag" type="button" data-tag="{{ . }}" title="筛选 #{{ . }}">#{{ . }}</button>
+                  {{ end }}
+                </div>
+              {{ end }}
+            </figcaption>
+          </figure>
+        {{ end }}
+      </div>
+      <div class="album-empty-msg" style="display: none;">🍃 该标签下暂无匹配照片</div>
+    </section>
+
   </div>
 </section>
-<dialog class="lightbox" aria-label="画作欣赏"><div class="lightbox-top"><span class="lightbox-count"></span><button class="lightbox-close" aria-label="关闭画作" autofocus>关闭 ×</button></div><img class="lightbox-image" alt=""><div class="lightbox-bottom"><button class="lightbox-prev" aria-label="上一幅">←</button><div><p class="lightbox-caption"></p><a class="lightbox-original" target="_blank" rel="noopener">查看原图 ↗</a></div><button class="lightbox-next" aria-label="下一幅">→</button></div></dialog>
-{{ $galleryJS := resources.Get "js/gallery.js" | minify | fingerprint }}<script src="{{ $galleryJS.RelPermalink }}" integrity="{{ $galleryJS.Data.Integrity }}" defer></script>
+
+<!-- 全屏大图灯箱 (Lightbox) -->
+<dialog class="lightbox" aria-label="相片欣赏">
+  <div class="lightbox-top">
+    <div class="lightbox-meta">
+      <span class="lightbox-category-tag"></span>
+      <span class="lightbox-count"></span>
+    </div>
+    <button class="lightbox-close" aria-label="关闭画作" autofocus>关闭 ×</button>
+  </div>
+  <div class="lightbox-stage">
+    <img class="lightbox-image" alt="">
+  </div>
+  <div class="lightbox-bottom">
+    <button class="lightbox-nav-btn lightbox-prev" aria-label="上一幅">← 上一幅</button>
+    <div class="lightbox-center-info">
+      <p class="lightbox-caption"></p>
+      <div class="lightbox-sub-info">
+        <span class="lightbox-tags-display"></span>
+        <a class="lightbox-original" target="_blank" rel="noopener">查看原图 ↗</a>
+      </div>
+    </div>
+    <button class="lightbox-nav-btn lightbox-next" aria-label="下一幅">下一幅 →</button>
+  </div>
+</dialog>
+
+{{ $galleryJS := resources.Get "js/gallery.js" | minify | fingerprint }}
+<script src="{{ $galleryJS.RelPermalink }}" integrity="{{ $galleryJS.Data.Integrity }}" defer></script>
 {{ end }}

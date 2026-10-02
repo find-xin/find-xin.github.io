@@ -1,0 +1,13 @@
+{{- $documents := slice -}}
+{{- range where site.RegularPages "Section" "ne" "search" -}}
+  {{- $documents = $documents | append (dict "title" .LinkTitle "url" .RelPermalink "snippet" (.Summary | plainify | truncate 90) "section" .Section "date" (.Date.Format "01-02") "year" (.Date.Format "2006") "tags" .Params.tags) -}}
+{{- end -}}
+{{- range hugo.Data.gallery.images -}}
+  {{- $catName := "动漫" -}}
+  {{- if eq .category "photography" }}{{ $catName = "摄影" }}{{ else if eq .category "daily" }}{{ $catName = "日常" }}{{ end -}}
+  {{- $tagList := delimit .tags ", " -}}
+  {{- $snippet := printf "相册【%s】 · 标签: %s" $catName $tagList -}}
+  {{- $itemUrl := printf "/gallery/#%s" .category -}}
+  {{- $documents = $documents | append (dict "title" .caption "url" $itemUrl "snippet" $snippet "section" "gallery" "category" $catName "date" (printf "#%s" .number) "year" "相册" "tags" .tags) -}}
+{{- end -}}
+{{- $documents | jsonify -}}

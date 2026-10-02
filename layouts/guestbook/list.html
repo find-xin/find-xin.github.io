@@ -1,9 +1,16 @@
 {{ define "main" }}
 <section class="guestbook-page shell">
-  <header class="page-heading">
-    <p class="diary-eyebrow">MESSAGE & FEEDBACK</p>
-    <h1>{{ .Title }}</h1>
-    <p class="friends-subtitle">{{ .Description | default "在这里留下你的回音，聊聊文章，也聊聊最近读到的作品与感悟。" }}</p>
+  <header class="page-header">
+    <div class="page-header-top">
+      <div>
+        <p class="page-eyebrow">MESSAGE & FEEDBACK · 留言板</p>
+        <h1 class="page-title">{{ .Title }}</h1>
+        <p class="page-desc">{{ .Description | default "在这里留下你的回音，聊聊文章，也聊聊最近读到的作品与生活感悟。" }}</p>
+      </div>
+      <div class="page-stats-badge">
+        <span>💌 交流与回音 · 期待你的声音</span>
+      </div>
+    </div>
   </header>
 
   <div class="guestbook-container">
@@ -13,6 +20,7 @@
         {{ .Content }}
       </div>
     </div>
+    {{ partial "comments.html" . }}
   </div>
 </section>
 {{ end }}

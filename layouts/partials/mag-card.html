@@ -2,8 +2,15 @@
 <article class="article-card article-card--{{ .size }}{{ if not $post.Params.cover }} article-card--text{{ end }}">
   {{ with $post.Params.cover }}<div class="article-image"><a href="{{ $post.RelPermalink }}" tabindex="-1" aria-hidden="true"><img src="{{ . | relURL }}" alt="" {{ if $.priority }}fetchpriority="high"{{ else }}loading="lazy"{{ end }}></a></div>{{ end }}
   <div class="article-content">
-    <div class="article-meta">{{ if $post.Params.pinned }}<span class="article-sticky">置顶</span>{{ end }}<time class="article-date" datetime="{{ $post.Date.Format "2006-01-02" }}">{{ $post.Date.Format "2006-01-02" }}</time></div>
+    <div class="article-meta">
+      {{ if $post.Params.pinned }}<span class="article-sticky">置顶</span>{{ end }}
+      <time class="article-date" datetime="{{ $post.Date.Format "2006-01-02" }}">{{ $post.Date.Format "2006-01-02" }}</time>
+      {{ if gt $post.WordCount 0 }}<span class="article-reading-stat">约 {{ $post.WordCount }} 字 · {{ $post.ReadingTime }} 分钟阅读</span>{{ end }}
+    </div>
     <h2 class="article-title"><a href="{{ $post.RelPermalink }}">{{ $post.Title }}</a></h2>
+    {{ with ($post.Summary | default $post.Description) }}
+      <p class="article-summary">{{ . | plainify | truncate 90 }}</p>
+    {{ end }}
     {{ with $post.GetTerms "tags" }}<div class="article-tags">{{ range first 3 . }}<a class="tag" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}
   </div>
 </article>

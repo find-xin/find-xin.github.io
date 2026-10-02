@@ -208,7 +208,7 @@ body.dark-mode .diary-filter-tab.active {
 
 .diary-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 16px 34px -8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 107, 107, 0.22);
+  box-shadow: 0 16px 34px -8px rgba(0, 0, 0, 0.12), 0 0 0 1.5px rgba(255, 107, 107, 0.25);
   border-color: rgba(255, 107, 107, 0.35);
 }
 
@@ -219,7 +219,7 @@ body.dark-mode .diary-card {
 }
 
 body.dark-mode .diary-card:hover {
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 107, 107, 0.3);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 0 1.5px rgba(255, 107, 107, 0.35);
   border-color: rgba(255, 107, 107, 0.4);
 }
 
@@ -726,36 +726,36 @@ body.dark-mode .diary-detail-content > p:first-of-type::first-letter {
   border-color: var(--primary-color);
 }
 
-/* Navigation prev / next */
+/* Navigation prev / next (Scheme A: Seamless Floating Bar) */
 .diary-nav-bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 28px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px dashed var(--border-color);
 }
 
-@media (max-width: 580px) {
-  .diary-nav-bar {
-    grid-template-columns: 1fr;
-  }
+body.dark-mode .diary-nav-bar {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.diary-nav-placeholder {
+  flex: 1;
 }
 
 .diary-nav-item {
-  padding: 16px 18px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: var(--card-background-color);
+  flex: 1;
+  max-width: 48%;
   text-decoration: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  transition: all 0.2s ease;
-}
-
-.diary-nav-item:hover {
-  border-color: var(--accent-color);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  gap: 5px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  transition: all 0.25s ease;
 }
 
 .diary-nav-item.next {
@@ -764,12 +764,64 @@ body.dark-mode .diary-detail-content > p:first-of-type::first-letter {
 }
 
 .diary-nav-item .nav-sub {
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--secondary-color);
+  opacity: 0.75;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.22s ease;
+}
+
+.diary-nav-item.next .nav-sub {
+  justify-content: flex-end;
 }
 
 .diary-nav-item .nav-title {
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--primary-color);
+  line-height: 1.45;
+  transition: color 0.2s ease;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.diary-nav-item:hover .nav-title {
+  color: var(--accent-color);
+}
+
+.diary-nav-item.prev:hover .nav-sub {
+  transform: translateX(-4px);
+  color: var(--accent-color);
+  opacity: 1;
+}
+
+.diary-nav-item.next:hover .nav-sub {
+  transform: translateX(4px);
+  color: var(--accent-color);
+  opacity: 1;
+}
+
+@media (max-width: 580px) {
+  .diary-nav-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+  }
+  .diary-nav-item {
+    max-width: 100%;
+  }
+  .diary-nav-item.next {
+    text-align: left;
+    margin-left: 0;
+  }
+  .diary-nav-item.next .nav-sub {
+    justify-content: flex-start;
+  }
 }

@@ -1,0 +1,30 @@
+<div id="spotlight-modal" class="spotlight-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="全站极速搜索">
+  <div class="spotlight-backdrop" id="spotlight-backdrop"></div>
+  <div class="spotlight-dialog">
+    <div class="spotlight-header">
+      <div class="spotlight-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </div>
+      <input id="spotlight-input" class="spotlight-input" type="search" placeholder="搜索文章标题、生活随笔、技术笔记或标签..." autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="spotlight-keys">
+        <kbd class="spotlight-kbd" id="spotlight-close-btn" title="按 ESC 关闭">ESC</kbd>
+      </div>
+    </div>
+    <div class="spotlight-body">
+      <div id="spotlight-results" class="spotlight-results">
+        <div class="spotlight-state-empty">
+          <span class="spotlight-empty-spark">✦</span>
+          <p>输入关键词实时检索 · 支持方向键 ↑ ↓ 选择 · 回车直达</p>
+        </div>
+      </div>
+    </div>
+    <div class="spotlight-footer">
+      <div class="spotlight-shortcuts">
+        <span><kbd>↑</kbd><kbd>↓</kbd> 切换</span>
+        <span><kbd>↵</kbd> 直达</span>
+        <span><kbd>esc</kbd> 关闭</span>
+      </div>
+      <span class="spotlight-status" id="spotlight-status">就绪</span>
+    </div>
+  </div>
+</div>

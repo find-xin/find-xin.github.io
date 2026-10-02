@@ -1,0 +1,43 @@
+{{ if site.Params.giscus.enable }}
+<section class="comments-section" id="comments-section">
+  <div class="comments-header">
+    <div class="comments-header-inner">
+      <span class="comments-sparkle" aria-hidden="true">💬</span>
+      <h3 class="comments-title">交流与回音</h3>
+    </div>
+    <span class="comments-hint">基于 GitHub Discussions · 纯净安全</span>
+  </div>
+  {{ if and site.Params.giscus.repoId site.Params.giscus.categoryId }}
+    <div class="giscus-frame-wrap" id="giscus-frame-container">
+      <script>
+        (function() {
+          const isDark = document.documentElement.dataset.theme === 'dark' || document.documentElement.classList.contains('dark-mode');
+          const s = document.createElement('script');
+          s.src = 'https://giscus.app/client.js';
+          s.dataset.repo = '{{ site.Params.giscus.repo }}';
+          s.dataset.repoId = '{{ site.Params.giscus.repoId }}';
+          s.dataset.category = '{{ site.Params.giscus.category | default "Announcements" }}';
+          s.dataset.categoryId = '{{ site.Params.giscus.categoryId }}';
+          s.dataset.mapping = '{{ site.Params.giscus.mapping | default "pathname" }}';
+          s.dataset.strict = '0';
+          s.dataset.reactionsEnabled = '{{ site.Params.giscus.reactionsEnabled | default "1" }}';
+          s.dataset.emitMetadata = '0';
+          s.dataset.inputPosition = 'top';
+          s.dataset.theme = isDark ? 'noborder_gray' : 'light';
+          s.dataset.lang = 'zh-CN';
+          s.crossOrigin = 'anonymous';
+          s.async = true;
+          document.getElementById('giscus-frame-container').appendChild(s);
+        })();
+      </script>
+    </div>
+  {{ else }}
+    <div class="giscus-placeholder">
+      <div class="giscus-placeholder-icon">✦</div>
+      <p class="giscus-placeholder-title">评论系统已就绪</p>
+      <p class="giscus-placeholder-text">只需在 <code>hugo.toml</code> 中填写 <code>repoId</code> 和 <code>categoryId</code>，即可激活基于 GitHub Discussions 的无侵入交流区。</p>
+      <a class="giscus-setup-btn" href="https://giscus.app/zh-CN" target="_blank" rel="noopener">前往 Giscus 配置 ↗</a>
+    </div>
+  {{ end }}
+</section>
+{{ end }}

@@ -2,17 +2,13 @@
 {{ $toc := .TableOfContents }}
 {{ $hasToc := findRE "<a " $toc }}
 <div class="post-wrapper{{ if $hasToc }} has-toc{{ end }}">
-{{ if $hasToc }}
-  <aside class="post-toc" aria-label="文章目录">
-    <p class="post-toc-title">目录</p>
-    <div class="post-toc-content">{{ $toc }}</div>
-  </aside>
+<article class="post-container">
+  {{ if $hasToc }}
   <details class="post-toc-mobile">
     <summary>目录</summary>
     <div class="post-toc-content">{{ $toc }}</div>
   </details>
-{{ end }}
-<article class="post-container">
+  {{ end }}
   <header class="post-header">
     {{ with .Params.cover }}<figure class="post-cover"><img src="{{ . | relURL }}" alt="{{ $.Title }}配图" fetchpriority="high"></figure>{{ end }}
     <div class="post-meta">{{ range first 1 (.GetTerms "categories") }}<span class="post-category"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></span>{{ end }}<time class="post-date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006-01-02" }}</time><span class="post-author">{{ site.Params.author }}</span>{{ if gt .WordCount 0 }}<span class="post-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟阅读</span>{{ end }}</div>
@@ -23,7 +19,6 @@
   <div class="post-signature-card">
     <div class="signature-avatar-wrap">
       <img class="signature-avatar" src="{{ site.Params.avatar | relURL }}" alt="{{ site.Params.author }}" width="56" height="56">
-      <span class="signature-status-dot" title="活跃在线"></span>
     </div>
     <div class="signature-content">
       <div class="signature-author-row">
@@ -37,7 +32,31 @@
       </div>
     </div>
   </div>
-  <nav class="post-navigation" aria-label="相邻文章">{{ with .PrevInSection }}<a class="post-nav prev" href="{{ .RelPermalink }}"><span class="nav-label">← 上一篇</span><span class="nav-title">{{ .Title }}</span></a>{{ end }}{{ with .NextInSection }}<a class="post-nav next" href="{{ .RelPermalink }}"><span class="nav-label">下一篇 →</span><span class="nav-title">{{ .Title }}</span></a>{{ end }}</nav>
+  <nav class="post-navigation" aria-label="相邻文章">
+    {{ with .PrevInSection }}
+      <a class="post-nav prev" href="{{ .RelPermalink }}">
+        <span class="nav-label">← 上一篇</span>
+        <span class="nav-title">{{ .Title }}</span>
+      </a>
+    {{ else }}
+      <div class="post-nav-placeholder"></div>
+    {{ end }}
+    {{ with .NextInSection }}
+      <a class="post-nav next" href="{{ .RelPermalink }}">
+        <span class="nav-label">下一篇 →</span>
+        <span class="nav-title">{{ .Title }}</span>
+      </a>
+    {{ else }}
+      <div class="post-nav-placeholder"></div>
+    {{ end }}
+  </nav>
+  {{ partial "comments.html" . }}
 </article>
+{{ if $hasToc }}
+<aside class="post-toc" aria-label="文章目录">
+  <p class="post-toc-title">目录</p>
+  <div class="post-toc-content">{{ $toc }}</div>
+</aside>
+{{ end }}
 </div>
 {{ end }}

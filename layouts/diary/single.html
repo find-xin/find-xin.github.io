@@ -55,13 +55,15 @@
           <span class="nav-title">{{ .Title }}</span>
         </a>
       {{ else }}
-        <div></div>
+        <div class="diary-nav-placeholder"></div>
       {{ end }}
       {{ with .NextInSection }}
         <a class="diary-nav-item next" href="{{ .RelPermalink }}">
           <span class="nav-sub">下一篇日记 →</span>
           <span class="nav-title">{{ .Title }}</span>
         </a>
+      {{ else }}
+        <div class="diary-nav-placeholder"></div>
       {{ end }}
     </nav>
   </article>

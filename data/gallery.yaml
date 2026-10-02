@@ -1,133 +1,302 @@
 images:
+  # ==========================================
+  # 1. 动漫相册 (Anime / Type-Moon 收藏)
+  # ==========================================
   - image: /images/gallery/collection-01.webp
     ratio: 1.1294
     number: "01"
+    category: "anime"
+    caption: '苍崎青子 & 久远寺有珠'
+    tags: ["魔法使之夜", "苍崎青子", "久远寺有珠"]
     source: '021dbd6adc7ae7569cfb3c2408af2ad05023e59a.jpg'
   - image: /images/gallery/collection-02.webp
     ratio: 1.7241
     number: "02"
+    category: "anime"
+    caption: '魔女之夜'
+    tags: ["魔法使之夜", "型月", "壁纸"]
     source: '08e034f7790c9e0bff2689a1adc3e9680081523cd7f73d0dcacadacc1cd51f77.webp'
   - image: /images/gallery/collection-03.webp
     ratio: 1.7844
     number: "03"
+    category: "anime"
+    caption: '静谧夜色'
+    tags: ["型月", "插画"]
     source: '1358897.png'
   - image: /images/gallery/collection-04.webp
     ratio: 1.7844
     number: "04"
+    category: "anime"
+    caption: '洋馆微光'
+    tags: ["魔法使之夜", "场景"]
     source: '1358899.png'
   - image: /images/gallery/collection-05.webp
     ratio: 1.7844
     number: "05"
+    category: "anime"
+    caption: '久远寺邸'
+    tags: ["魔法使之夜", "插画"]
     source: '1358901.png'
   - image: /images/gallery/collection-06.webp
     ratio: 0.6544
     number: "06"
+    category: "anime"
+    caption: '苍崎青子·魔弹'
+    tags: ["魔法使之夜", "苍崎青子"]
     source: '1732611452910.jpg'
   - image: /images/gallery/collection-07.webp
     ratio: 0.7333
     number: "07"
+    category: "anime"
+    caption: '有珠与使魔'
+    tags: ["魔法使之夜", "久远寺有珠"]
     source: '1764507349328-019ad4d5-074c-7757-9fc6-67d1aa7b936.png'
   - image: /images/gallery/collection-08.webp
     ratio: 0.7333
     number: "08"
+    category: "anime"
+    caption: '雪原与微风'
+    tags: ["型月", "壁纸"]
     source: '1764507595437-019ad4d8-98be-70a1-853b-2d658546183.png'
   - image: /images/gallery/collection-09.webp
     ratio: 0.7333
     number: "09"
-    source: '1764507737400-019ad4da-84ad-7d51-9a34-448308506d0.png'
+    category: "anime"
     caption: '贞德〔Alter〕'
+    tags: ["Fate", "黑贞", "角色"]
+    source: '1764507737400-019ad4da-84ad-7d51-9a34-448308506d0.png'
   - image: /images/gallery/collection-10.webp
     ratio: 0.7333
     number: "10"
+    category: "anime"
+    caption: '圣杯之誓'
+    tags: ["Fate", "插画"]
     source: '1764508144795-019ad4e1-26c1-73c3-83b9-d5479170c2c.png'
   - image: /images/gallery/collection-11.webp
     ratio: 1.5126
     number: "11"
+    category: "anime"
+    caption: '阿尔托莉雅'
+    tags: ["Fate", "阿尔托莉雅", "角色"]
     source: '1767202600940.jpg'
   - image: /images/gallery/collection-12.webp
     ratio: 1.7769
     number: "12"
+    category: "anime"
+    caption: '月下誓约'
+    tags: ["Fate", "壁纸"]
     source: '1767202732968.jpg'
   - image: /images/gallery/collection-13.webp
     ratio: 0.6866
     number: "13"
+    category: "anime"
+    caption: '爱尔奎特'
+    tags: ["月姬", "爱尔奎特", "角色"]
     source: '2783bf6de74d51cbd6886924739118d20d8e701419403bb2ffc83fb31fd5dc9c (1).jpg'
   - image: /images/gallery/collection-14.webp
     ratio: 0.7286
     number: "14"
+    category: "anime"
+    caption: '真祖之月'
+    tags: ["月姬", "角色"]
     source: '5cd1c2a6b8bc55c7907a8896b466c408cf1690130d5d95ce922d0026aa404205.webp'
   - image: /images/gallery/collection-15.webp
     ratio: 0.6617
     number: "15"
+    category: "anime"
+    caption: '红月之夜'
+    tags: ["月姬", "插画"]
     source: '661f6844816cd05160549cb67b117695059ae1d7bb539240f8d57ac29a30dd98.jpg'
   - image: /images/gallery/collection-16.webp
     ratio: 1.4196
     number: "16"
+    category: "anime"
+    caption: '两仪未那'
+    tags: ["空之境界", "两仪式"]
     source: '69c6fe860385f9c664736e01c885659c4d5735b2_raw.jpg'
   - image: /images/gallery/collection-17.webp
     ratio: 1.7717
     number: "17"
+    category: "anime"
     caption: '苍崎青子'
+    tags: ["魔法使之夜", "苍崎青子"]
     source: 'IMG_20250108_234054.png'
   - image: /images/gallery/collection-18.webp
     ratio: 1.6115
     number: "18"
+    category: "anime"
+    caption: '第五魔法'
+    tags: ["魔法使之夜", "壁纸"]
     source: 'IMG_20250116_232900.png'
   - image: /images/gallery/collection-19.webp
     ratio: 1.4907
     number: "19"
+    category: "anime"
+    caption: '夜之礼装'
+    tags: ["型月", "角色"]
     source: 'IMG_20250116_233256.jpg'
   - image: /images/gallery/collection-20.webp
     ratio: 1.5748
     number: "20"
+    category: "anime"
+    caption: '三咲町黄昏'
+    tags: ["魔法使之夜", "场景"]
     source: 'IMG_20250726_194217.jpg'
   - image: /images/gallery/collection-21.webp
-    ratio: 0.5400
+    ratio: 0.54
     number: "21"
+    category: "anime"
+    caption: '知更鸟罗宾'
+    tags: ["魔法使之夜", "使魔"]
     source: 'IMG_20250726_194251.jpg'
   - image: /images/gallery/collection-22.webp
     ratio: 1.7778
     number: "22"
+    category: "anime"
+    caption: '苍崎橙子'
+    tags: ["空之境界", "魔法使之夜"]
     source: 'IMG_20250726_223320.png'
   - image: /images/gallery/collection-23.webp
     ratio: 0.6211
     number: "23"
+    category: "anime"
+    caption: '久远寺有珠·静谧'
+    tags: ["魔法使之夜", "久远寺有珠"]
     source: 'IMG_20260101_224947.jpg'
   - image: /images/gallery/collection-24.webp
-    ratio: 0.6670
+    ratio: 0.667
     number: "24"
+    category: "anime"
+    caption: '红白交织'
+    tags: ["Fate", "插画"]
     source: 'cd0cab6df23525c565fa307ea40bf86b07ee5e8f8cfdb962eef4303e687eb8fd.jpg'
   - image: /images/gallery/collection-25.webp
-    ratio: 0.7500
+    ratio: 0.75
     number: "25"
+    category: "anime"
+    caption: '星空漫游'
+    tags: ["型月", "壁纸"]
     source: 'null3b9c5bb3c314cb0.jpg'
   - image: /images/gallery/collection-26.webp
     ratio: 0.7067
     number: "26"
+    category: "anime"
+    caption: '纯黑华服'
+    tags: ["Fate", "角色"]
     source: 'v2-553d3c5db2685d4a8f2f83928aaba5ac_1440w.webp'
   - image: /images/gallery/collection-27.webp
     ratio: 1.7773
     number: "27"
-    source: '415483.png'
+    category: "anime"
     caption: '雨巷与红伞'
+    tags: ["魔法使之夜", "久远寺有珠"]
+    source: '415483.png'
   - image: /images/gallery/collection-28.webp
     ratio: 1.7778
     number: "28"
-    source: '1408443.jpg'
+    category: "anime"
     caption: '夜色与青色魔法'
+    tags: ["魔法使之夜", "苍崎青子"]
+    source: '1408443.jpg'
   - image: /images/gallery/collection-29.webp
     ratio: 1.7773
     number: "29"
-    source: '久远寺有珠3840x2160.png'
+    category: "anime"
     caption: '久远寺有珠'
+    tags: ["魔法使之夜", "久远寺有珠"]
+    source: '久远寺有珠3840x2160.png'
   - image: /images/gallery/collection-30.webp
     ratio: 1.6667
     number: "30"
-    source: 'ia917b9a6f566fa49ab5d68eb4a159010mg .png'
+    category: "anime"
     caption: '魔女宅邸'
+    tags: ["魔法使之夜", "场景"]
+    source: 'ia917b9a6f566fa49ab5d68eb4a159010mg .png'
   - image: /images/gallery/collection-31.webp
     original: /images/gallery/collection-31-original.png
     ratio: 1.6
     number: "31"
-    source: 'b9f09dc3d2c48ee46e0e793ab3f62de0e733f689_upscayl_1x_digital-art-4x.png'
+    category: "anime"
     caption: '星河与花海'
+    tags: ["魔法使之夜", "壁纸"]
+    source: 'b9f09dc3d2c48ee46e0e793ab3f62de0e733f689_upscayl_1x_digital-art-4x.png'
+
+  # ==========================================
+  # 2. 摄影相册 (Photography)
+  # ==========================================
+  - image: /images/photography/photo-01.webp
+    ratio: 1.6484
+    number: "p01"
+    category: "photography"
+    caption: '雨夜街景与霓虹倒影'
+    tags: ["街拍", "光影", "雨夜", "城市"]
+  - image: /images/photography/photo-02.webp
+    ratio: 0.5967
+    number: "p02"
+    category: "photography"
+    caption: '极简建筑与午后斜影'
+    tags: ["建筑", "光影", "极简", "几何"]
+  - image: /images/photography/photo-03.webp
+    ratio: 1.6783
+    number: "p03"
+    category: "photography"
+    caption: '晨雾缭绕的山峦与森林'
+    tags: ["风景", "自然", "晨雾", "治愈"]
+  - image: /images/photography/photo-04.webp
+    ratio: 0.6667
+    number: "p04"
+    category: "photography"
+    caption: '穿透林隙的金色微光'
+    tags: ["光影", "森林", "自然", "秋天"]
+  - image: /images/photography/photo-05.webp
+    ratio: 1.7778
+    number: "p05"
+    category: "photography"
+    caption: '暮色天际线与渐变晚霞'
+    tags: ["晚霞", "城市", "暮色", "天空"]
+  - image: /images/photography/photo-06.webp
+    ratio: 1.4981
+    number: "p06"
+    category: "photography"
+    caption: '静水流深与群山倒影'
+    tags: ["风景", "倒影", "山水", "治愈"]
+
+  # ==========================================
+  # 3. 日常相册 (Daily Life)
+  # ==========================================
+  - image: /images/daily/daily-01.webp
+    ratio: 1.5132
+    number: "d01"
+    category: "daily"
+    caption: '街角手冲咖啡与木桌'
+    tags: ["咖啡", "下午茶", "慢生活", "日常"]
+  - image: /images/daily/daily-02.webp
+    ratio: 1.5484
+    number: "d02"
+    category: "daily"
+    caption: '午后闲读的一页时光'
+    tags: ["阅读", "书籍", "午后", "生活"]
+  - image: /images/daily/daily-03.webp
+    ratio: 1.5
+    number: "d03"
+    category: "daily"
+    caption: '深夜静谧的代码工作台'
+    tags: ["工作台", "代码", "桌面", "日常"]
+  - image: /images/daily/daily-04.webp
+    ratio: 1.5
+    number: "d04"
+    category: "daily"
+    caption: '林间小径的秋日漫步'
+    tags: ["散步", "秋天", "随想", "生活"]
+  - image: /images/daily/daily-05.webp
+    ratio: 1.5019
+    number: "d05"
+    category: "daily"
+    caption: '窗台绿植与清晨微光'
+    tags: ["晨光", "植物", "生活", "随拍"]
+  - image: /images/daily/daily-06.webp
+    ratio: 0.6678
+    number: "d06"
+    category: "daily"
+    caption: '粉嫩花瓣与温柔日常'
+    tags: ["鲜花", "治愈", "生活", "日常"]

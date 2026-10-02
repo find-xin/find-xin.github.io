@@ -1,5 +1,9 @@
 {{ define "main" }}
 {{ $posts := (where site.RegularPages "Section" "posts").ByDate.Reverse }}
+{{ $diaries := (where site.RegularPages "Section" "diary").ByDate.Reverse }}
+{{ $allImages := hugo.Data.gallery.images }}
+
+<!-- 1. 英雄区 / 作者名片 -->
 <section class="author-card-section" aria-label="作者">
   <div class="author-card-container">
     <div class="author-card author-card--large author-card--full-image">
@@ -13,11 +17,14 @@
         <span class="star s5"></span>
         <span class="star s6"></span>
         <span class="shooting-star"></span>
+        <span class="petal p1"></span>
+        <span class="petal p2"></span>
+        <span class="petal p3"></span>
       </div>
       <div class="author-card-profile">
+        <div class="author-badge-tag">✦ TYPE-MOON ADDICT</div>
         <div class="author-avatar">
           <img src="{{ site.Params.avatar | relURL }}" alt="{{ site.Params.author }} 的头像" width="120" height="120">
-          <span class="avatar-status-dot" title="活跃在线" aria-label="在线"></span>
         </div>
         <div class="author-info">
           <h1 class="author-name">{{ site.Params.author }}</h1>
@@ -41,6 +48,8 @@
     </div>
   </div>
 </section>
+
+<!-- 2. 最新文章 -->
 <section class="articles-section" aria-label="文章">
   <div class="section-header">
     <div class="section-title-wrap">
@@ -57,4 +66,74 @@
     {{ end }}
   </div>
 </section>
+
+<!-- 3. 生活微光 · 近期手记 (日记联动) -->
+{{ if gt (len $diaries) 0 }}
+<section class="home-diary-section shell" aria-label="近期手记">
+  <div class="section-header">
+    <div class="section-title-wrap">
+      <span class="section-eyebrow">DAILY LIFE · 生活手记</span>
+      <h2 class="section-title">生活微光</h2>
+    </div>
+    <a class="section-more-link" href="{{ "diary/" | relURL }}">全部手记 <span>→</span></a>
+  </div>
+  <div class="home-diary-grid">
+    {{ range first 3 $diaries }}
+      <article class="home-diary-card">
+        <a class="home-diary-card-link" href="{{ .RelPermalink }}">
+          {{ with .Params.cover }}
+            <div class="home-diary-cover-wrap">
+              <img src="{{ . | relURL }}" alt="{{ $.Title }}" loading="lazy">
+              {{ with $.Params.mood }}<span class="diary-badge">{{ . }}</span>{{ else }}{{ with $.Params.weather }}<span class="diary-badge">{{ . }}</span>{{ end }}{{ end }}
+            </div>
+          {{ end }}
+          <div class="home-diary-body">
+            <div class="home-diary-meta">
+              <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006年01月02日" }}</time>
+            </div>
+            <h3 class="home-diary-title">{{ .Title }}</h3>
+            <p class="home-diary-summary">{{ .Summary | plainify | truncate 70 }}</p>
+            <span class="home-diary-readmore">翻开这篇 ↗</span>
+          </div>
+        </a>
+      </article>
+    {{ end }}
+  </div>
+</section>
+{{ end }}
+
+<!-- 4. 光影切片 · 精选相册 (相册联动) -->
+{{ if gt (len $allImages) 0 }}
+<section class="home-gallery-section shell" aria-label="精选相册">
+  <div class="section-header">
+    <div class="section-title-wrap">
+      <span class="section-eyebrow">PHOTO ALBUMS · 精选相册</span>
+      <h2 class="section-title">光影切片</h2>
+    </div>
+    <a class="section-more-link" href="{{ "gallery/" | relURL }}">漫游相册 <span>→</span></a>
+  </div>
+  {{ $homeSamples := slice }}
+  {{ range first 1 (where $allImages "category" "photography") }}{{ $homeSamples = $homeSamples | append . }}{{ end }}
+  {{ range first 1 (where $allImages "category" "daily") }}{{ $homeSamples = $homeSamples | append . }}{{ end }}
+  {{ range first 2 (where $allImages "category" "anime") }}{{ $homeSamples = $homeSamples | append . }}{{ end }}
+  <div class="home-gallery-grid">
+    {{ range $homeSamples }}
+      <a class="home-gallery-card" href="{{ "gallery/" | relURL }}#{{ .category }}" title="{{ .caption }}">
+        <div class="home-gallery-media">
+          <img src="{{ .image | relURL }}" alt="{{ .caption }}" loading="lazy">
+          <div class="home-gallery-overlay">
+            <span class="home-gallery-zoom">欣赏相片 ↗</span>
+          </div>
+          <span class="album-card-badge">{{ if eq .category "photography" }}📷 摄影{{ else if eq .category "daily" }}☕ 日常{{ else }}🎨 动漫{{ end }}</span>
+        </div>
+        <div class="home-gallery-info">
+          <span class="home-gallery-caption">{{ .caption }}</span>
+          <small class="home-gallery-num">#{{ .number }}</small>
+        </div>
+      </a>
+    {{ end }}
+  </div>
+</section>
+{{ end }}
+
 {{ end }}

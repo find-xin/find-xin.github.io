@@ -20,6 +20,26 @@ title = 'find-xin 的博客'
   tag = 'tags'
   category = 'categories'
 
+[outputs]
+  home = ["HTML", "RSS", "JSON"]
+
+[params.giscus]
+  enable = true
+  repo = "find-xin/find-xin.github.io"
+  repoId = "R_kgDOUrmUfg"       # 前往 https://giscus.app 填写 GitHub 仓库后自动生成
+  category = "Announcements"
+  categoryId = "DIC_kwDOUrmUfs4DG0nm"   # 前往 https://giscus.app 选择分类后自动生成
+  mapping = "pathname"
+  reactionsEnabled = "1"
+  emitMetadata = "0"
+  inputPosition = "top"
+  lang = "zh-CN"
+
+enableRobotsTXT = true
+
+[minify]
+  minifyOutput = true
+
 [markup.goldmark.renderer]
   unsafe = false
 

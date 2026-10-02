@@ -1,9 +1,16 @@
 {{ define "main" }}
 <section class="friends-page shell">
-  <header class="page-heading">
-    <p class="diary-eyebrow">FRIENDS & BLOGS</p>
-    <h1>{{ .Title }}</h1>
-    <p class="friends-subtitle">{{ .Description | default "海内存知己，天涯若比邻。收录常读的个人站点与朋友们。" }}</p>
+  <header class="page-header">
+    <div class="page-header-top">
+      <div>
+        <p class="page-eyebrow">FRIENDS & BLOGS · 友人帐</p>
+        <h1 class="page-title">{{ .Title }}</h1>
+        <p class="page-desc">{{ .Description | default "海内存知己，天涯若比邻。收录常读的个人站点与朋友们。" }}</p>
+      </div>
+      <div class="page-stats-badge">
+        <span>🤝 共收录 {{ len hugo.Data.friends.friends }} 位伙伴</span>
+      </div>
+    </div>
   </header>
 
   <div class="friends-grid">

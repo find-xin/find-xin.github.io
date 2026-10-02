@@ -1,101 +1,291 @@
-# find-xin 的博客
+# find-xin 的个人博客 (Hugo Magazine Theme)
 
-这是一个使用 Hugo Extended 构建的静态博客，页面样式移植自 [Magzine Hexo 主题](https://github.com/forever218/hexo-theme-magzine)。仓库的 `main` 分支通过 GitHub Actions 部署到 [find-xin.github.io](https://find-xin.github.io/)。
+本项目是基于 **Hugo Extended** 构建的高性能静态博客，融合了优雅的杂志排版（Magazine Style）、日夜间双重模式平滑切换、全站沉浸式相册、微光生活日记、Giscus 社区留言板及客户端全文检索。
 
-## 开始写一篇文章
+博客通过 GitHub Actions 自动化持续集成（CI/CD），一旦将修改推送到 `main` 分支，即会自动构建并部署到 [find-xin.github.io](https://find-xin.github.io/)。
 
-在项目根目录运行：
-
-```sh
-hugo new content/posts/my-post.md
-```
-
-将 `my-post` 改成文章的英文文件名。新文章位于 `content/posts/`，默认 `draft: true`，可以先在本地预览而不进入正式构建。编辑文件时，保留开头两行 `---` 之间的 Front Matter，例如：
-
-```yaml
 ---
-title: '文章标题'
-date: 2026-09-28T20:00:00+08:00
-draft: true
-summary: '一句话介绍文章内容。'
-cover: '/images/posts/my-post-cover.webp'
-pinned: false
-tags: ['Hugo', '笔记']
-categories: ['技术']
+
+## 目录索引
+
+- [1. 网站核心目录架构](#1-网站核心目录架构)
+- [2. 发布内容指南](#2-发布内容指南)
+  - [2.1 撰写长篇博文（Markdown 文章）](#21-撰写长篇博文markdown-文章)
+  - [2.2 记录随想与微光日记（Diary）](#22-记录随想与微光日记diary)
+  - [2.3 插入图片与撰写「带图 Markdown」](#23-插入图片与撰写带图-markdown)
+  - [2.4 上传与嵌入 PDF 文档](#24-上传与嵌入-pdf-文档)
+  - [2.5 管理多分区相册（摄影 / 日常 / 动漫）](#25-管理多分区相册摄影--日常--动漫)
+- [3. 本地调试与上传 GitHub 操作流程（必读命令）](#3-本地调试与上传-github-操作流程必读命令)
+- [4. 常见问题与避坑提示](#4-常见问题与避坑提示)
+
 ---
-```
 
-`title` 是文章标题；`date` 控制首页和归档排序；`summary` 可用于摘要；`tags` 和 `categories` 会生成对应的标签、分类页。`pinned: true` 只显示置顶标记，不改变排序。`cover` 可留空，留空时首页使用纯文字卡片。旧文章中的 `cardStyle` 字段已经不起作用，新文章无需填写。
+## 1. 网站核心目录架构
 
-在 Front Matter 之后用 Markdown 写正文。使用 `##`、`###` 等小标题会自动生成文章左侧目录；没有小标题时目录不显示。例如：
-
-```md
-## 第一部分
-
-正文内容。
-
-### 一个小节
-
-更多内容。
-```
-
-当前 `content/posts/` 中的三篇文章是示例，正式发布自己的文章前可以修改或删除它们。
-
-## 准备图片
-
-把文章封面及正文图片放到 `static/images/posts/`，建议使用 `.webp`，文件名使用英文、数字和短横线。路径从 `static/` 后开始写，前面加 `/`：
+了解各个文件夹的职责，有助于快速定位要修改和存放的文件：
 
 ```text
-磁盘文件：static/images/posts/my-post-cover.webp
-封面路径：/images/posts/my-post-cover.webp
+youshu-night/
+├── content/                     # 内容源文件（全部采用 Markdown 撰写）
+│   ├── posts/                   # 深度博文、技术笔记、长文
+│   ├── diary/                   # 生活微光、短篇日记、随笔
+│   ├── gallery/                 # 相册页面元数据
+│   ├── friends/                 # 友链页面
+│   └── guestbook/               # 留言板页面
+├── static/                      # 静态资源根目录（编译时会被完整复制到网站根目录 /）
+│   ├── docs/                    # 存放 PDF 文档、报告等文件
+│   └── images/                  # 存放全站图片
+│       ├── posts/               # 文章封面及正文插图
+│       ├── photography/         # 摄影大片
+│       ├── daily/               # 日常生活记录照片
+│       └── gallery/             # 动漫/插画/收藏图库
+├── data/
+│   └── gallery.yaml             # 相册数据库（在此登记照片信息、长宽比、标签与分类）
+├── layouts/                     # Hugo 页面模板（HTML）
+├── assets/                      # 前端样式与脚本（CSS / JS）
+├── hugo.toml                    # 博客全局配置文件
+└── .github/workflows/pages.yml  # GitHub Actions 自动构建与部署脚本
 ```
 
-正文插图用 Markdown 引用，并写有意义的替代文字：
+---
 
-```md
-![图片内容说明](/images/posts/my-post-detail.webp)
+## 2. 发布内容指南
+
+### 2.1 撰写长篇博文（Markdown 文章）
+
+博文存放在 `content/posts/` 目录下。
+
+#### 步骤 1：新建文章文件
+在项目根目录下通过终端生成，或者直接在编辑器中手动创建 `.md` 文件：
+
+```bash
+# 自动生成（文件名建议使用英文小写和中划线）
+hugo new content/posts/my-new-article.md
 ```
 
-封面会用于首页卡片、归档条目和文章顶部，不同位置会裁切图片。选图后请在电脑和手机预览中检查人物、文字等重要内容是否被裁掉。首页顶部大图由 `hugo.toml` 中的 `heroImage` 指定，头像由 `avatar` 指定；更换图片时同时修改对应路径。
-
-画廊图片放在 `static/images/gallery/`，并在 `data/gallery.yaml` 的 `images` 列表中添加一项：
+#### 步骤 2：编辑文章头部参数（Front Matter）
+打开新建的文件，顶部在两行 `---` 之间填写元数据：
 
 ```yaml
-- image: /images/gallery/collection-32.webp
-  ratio: 1.7778
-  number: "32"
-  caption: '图片说明'
+---
+title: '如何构建优雅的静态博客'
+date: 2026-10-02T14:00:00+08:00
+draft: false                          # false 表示正式发布；true 为本地草稿（线上不显示）
+summary: '本文记录了博客的设计思考与架构迁移全过程。' # 首页杂志卡片与搜索的摘要
+cover: '/images/posts/my-cover.webp'   # 封面图路径（留空则显示优雅的纯文字卡片）
+pinned: false                         # 设置为 true 会在首页卡片显示“置顶”星标
+categories: ['技术']                  # 分类（支持单个或多个）
+tags: ['Hugo', '前端', 'Web']          # 标签（用于全站标签归档和搜索）
+---
 ```
 
-`ratio` 是图片宽度除以高度；`number` 保留引号。若另有原图，可增加 `original: /images/gallery/原图文件名.png`，画廊会提供查看原图的入口。
+#### 步骤 3：编写正文
+在 Front Matter 之后正常使用 Markdown 语法书写。
+- **目录生成**：只要正文中使用 `## 二级标题`、`### 三级标题`，文章页面左侧便会自动生成悬浮可折叠的目录导航。
+- **代码高亮**：使用 ```` ```python ```` 或 ```` ```js ```` 包裹代码块即可自动美化。
 
-## 本地预览与发布
+---
 
-需要安装 **Hugo Extended**。写作时运行：
+### 2.2 记录随想与微光日记（Diary）
 
-```sh
+日记存放在 `content/diary/` 目录下，适合短篇生活记录、心情杂谈、随手拍碎片。
+
+#### 步骤 1：创建日记文件
+例如创建 `content/diary/2026-autumn-walk.md`：
+
+```yaml
+---
+title: '秋日傍晚的滨江漫步'
+date: 2026-10-02T19:00:00+08:00
+draft: false
+mood: '惬意'                           # 心情标签（可选，如：惬意 / 晴朗 / 沉思）
+location: '徐汇滨江'                   # 地理位置（可选）
+cover: '/images/daily/autumn-walk.webp'# 可选封面配图
+tags: ['散步', '秋天', '日常生活']
+likes: 6                              # 初始点赞数
+---
+
+正文记录今天的心情与生活切片……
+```
+
+日记会自动同步在首页下方的「生活微光 · 近期手记」时间轴展示，并汇入全站搜索。
+
+---
+
+### 2.3 插入图片与撰写「带图 Markdown」
+
+#### 1. 图片格式与命名规范
+- **推荐格式**：首选 **`.webp`**（体积小、加载迅速、画质无损），也支持 `.png`、`.jpg`、`.jpeg`、`.gif`、`.svg`。
+- **命名规范**：文件名全部使用**小写英文字母、数字和减号 `-`**，例如 `tokyo-tower-night.webp`。禁止使用中文字符或空格，防止在网络传输或生成 URL 时被特殊字符转义导致无法显示。
+- **压缩建议**：建议将图片尺寸宽度控制在 `1200px ~ 2400px` 之间，单张体积控制在 `500KB` 以内（推荐使用 [squoosh.app](https://squoosh.app) 或 `cwebp` 工具转换）。
+
+#### 2. 图片存放在哪里？
+根据用途存放至 `static/` 下的对应子目录中：
+- 文章配图与封面：存放至 `static/images/posts/`
+- 摄影作品原图：存放至 `static/images/photography/`
+- 日常随手拍：存放至 `static/images/daily/`
+- 动漫/收藏插画：存放至 `static/images/gallery/`
+
+#### 3. 关键路径规则（绝对路径以 `/` 开头）
+> ⚠️ **重要规则**：`static` 文件夹是 Hugo 的映射根目录。引用时**切勿加上 `static`**！
+> - 实际电脑中的物理路径：`static/images/posts/my-illustration.webp`
+> - 在 Markdown 或配置文件中的路径：`/images/posts/my-illustration.webp`
+
+#### 4. 在 Markdown 中引用图片的几种方式
+
+##### 方式一：标准 Markdown 语法（推荐）
+```markdown
+![这里填写图片描述说明文字](/images/posts/my-illustration.webp)
+```
+
+##### 方式二：带标题的图片语法（悬停显示标题）
+```markdown
+![秋日晨光](/images/posts/autumn-morning.webp "摄于世纪公园")
+```
+
+##### 方式三：HTML 优雅居中卡片（带自适应阴影与图注说明）
+如果想对图片排版做更精细的控制，可以直接混入 HTML 代码：
+```html
+<figure style="text-align: center; margin: 2rem 0;">
+  <img src="/images/posts/autumn-morning.webp" alt="秋日晨光" style="max-width: 90%; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+  <figcaption style="font-size: 0.88rem; color: var(--color-meta); margin-top: 8px;">图：秋日晨光穿透林间树隙</figcaption>
+</figure>
+```
+
+---
+
+### 2.4 上传与嵌入 PDF 文档
+
+如果需要分享论文、设计方案、简历、报告等 PDF 文档：
+
+#### 步骤 1：放置 PDF 文件
+将你的 PDF 文件放置到：
+```text
+static/docs/your-document-name.pdf
+```
+（例如：`static/docs/hugo-architecture-guide.pdf`）
+
+#### 步骤 2：在文章中引用 PDF
+
+##### 方式 A：普通下载 / 跳转链接
+```markdown
+👉 [点击在线阅读或下载《Hugo 架构指南》(PDF)](/docs/hugo-architecture-guide.pdf)
+```
+
+##### 方式 B：精美胶囊按钮（新标签页打开）
+```html
+<p style="text-align: center; margin: 1.5rem 0;">
+  <a href="/docs/hugo-architecture-guide.pdf" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--color-accent); color: #ffffff; border-radius: 999px; text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: transform 0.2s;">
+    📄 在新标签页阅读《Hugo 架构指南》(PDF)
+  </a>
+</p>
+```
+
+##### 方式 C：正文中直接内嵌 PDF 阅读器窗口
+用户无需跳出网页，即可在文章内滚动查阅 PDF 内容：
+```html
+<div style="margin: 2rem 0; width: 100%;">
+  <iframe src="/docs/hugo-architecture-guide.pdf" width="100%" height="650px" style="border: 1px solid var(--color-border); border-radius: 8px; background: #fff;">
+    <p>您的浏览器暂不支持内嵌预览，请 <a href="/docs/hugo-architecture-guide.pdf">点击此处下载 PDF</a> 查看。</p>
+  </iframe>
+</div>
+```
+
+---
+
+### 2.5 管理多分区相册（摄影 / 日常 / 动漫）
+
+全站相册页面（`/gallery/`）分为三大板块：
+1. **摄影 (`photography`)**
+2. **日常 (`daily`)**
+3. **动漫 (`anime`)**
+
+每个板块均自带标签筛选器、全屏放大灯箱（支持手机左右滑动切图）、原图查看等功能。
+
+#### 添加一张新照片到相册：
+1. 将照片文件放置在对应文件夹：
+   - 摄影：`static/images/photography/photo-name.webp`
+   - 日常：`static/images/daily/life-snap.webp`
+   - 动漫：`static/images/gallery/illustration.webp`
+2. 打开 `data/gallery.yaml`，在末尾新增一条记录：
+
+```yaml
+- image: /images/photography/shanghai-tower.webp   # 图片访问路径（以 / 开头）
+  category: photography                          # 分区：photography（摄影）| daily（日常）| anime（动漫）
+  ratio: 1.5                                     # 图片宽高比（宽 ÷ 高）。横屏通常为 1.5 (3:2) 或 1.7778 (16:9)；竖屏通常为 0.6667 (2:3) 或 0.75 (3:4)；正方形写 1.0
+  number: "44"                                   # 唯一序号（保持连续递增，用双引号包裹）
+  caption: '上海中心 · 暮色云端'                 # 图片标题或描述说明
+  tags: ['城市', '建筑', '夜景']                  # 检索与筛选标签列表
+  original: /images/photography/shanghai-tower.webp # 可选，高清原图路径
+```
+
+保存后，相册页面及首页下方的「光影切片」都会自动加载该照片并支持标签筛选！
+
+---
+
+## 3. 本地调试与上传 GitHub 操作流程（必读命令）
+
+日常写博客、添加照片或修改页面的标准闭环工作流：
+
+### 步骤 1：本地启动预览（实时热重载）
+在终端中进入项目目录，运行以下命令启动本地服务：
+
+```bash
 hugo server -D --port 1314 --bind 127.0.0.1 --disableFastRender
 ```
 
-打开 <http://localhost:1314/>。`-D` 会把草稿也显示出来。准备发布时，把要发布文章的 `draft` 改为 `false`，然后运行与 GitHub Actions 相同的构建命令：
+- 浏览器打开：**`http://localhost:1314/`**
+- 说明：`-D` 参数表示允许展示处于 `draft: true` 状态的草稿文章，保存文件时浏览器会自动刷新同步。
 
-```sh
-hugo --minify
+### 步骤 2：发布前检查
+在确认内容无误准备正式发布前：
+1. 将要发布的 Markdown 文件头部中的 `draft: true` 改为 `draft: false`。
+2. 在终端执行一次预编译，确保没有语法冲突或路径错误：
+   ```bash
+   hugo --minify
+   ```
+   如果看到输出 `Total in XX ms` 且无报错提示，即代表编译完全正常。
+
+### 步骤 3：提交修改到 Git
+运行以下命令暂存并提交所有更改：
+
+```bash
+# 1. 查看当前哪些文件发生了改动或新增
+git status
+
+# 2. 将所有新增文件与修改暂存到 Git 暂存区
+git add .
+
+# 3. 提交并附带简要清晰的说明信息
+git commit -m "feat: 发布新文章《构建优雅的静态博客》并更新相册"
 ```
 
-检查首页、文章页、标签、分类、归档和图片都正常后，提交并推送：
+### 步骤 4：推送到 GitHub 并触发自动化部署
+运行以下命令将代码推送到 GitHub 远程仓库：
 
-```sh
-git add content/posts static/images/posts data/gallery.yaml static/images/gallery
-git commit -m "Publish new post"
+```bash
 git push origin main
 ```
 
-只需暂存这次实际修改过的文件；如果同时修改了 `hugo.toml`、布局或样式，也把它们加入提交。推送 `main` 后，`.github/workflows/pages.yml` 会自动构建并部署。首次部署需在 GitHub 仓库的 **Settings → Pages → Build and deployment** 中把 Source 设为 **GitHub Actions**；此仓库的 `baseURL` 已设置为 `https://find-xin.github.io/`。
+### 步骤 5：验证线上发布
+1. 打开你的 GitHub 仓库主页：[https://github.com/find-xin/find-xin.github.io](https://github.com/find-xin/find-xin.github.io)
+2. 点击顶部的 **Actions** 标签页，你会看到名为 `Deploy Hugo site to Pages` 的工作流正在自动运行（通常在 30 秒至 1 分钟内完成）。
+3. 工作流运行成功打上绿色勾号后，访问线上博客：**[https://find-xin.github.io/](https://find-xin.github.io/)** 查看更新。
 
-## 主题文件
+> 💡 **提示**：如果线上页面没有立即显示新内容，是因为浏览器缓存。请按下快捷键：
+> - Windows: `Ctrl + F5` 强制刷新
+> - macOS: `Cmd + Shift + R` 强制刷新
 
-- `assets/css/magzine-original.css`：Magzine 原始样式。
-- `assets/css/magzine-hugo.css`：本站的 Hugo 与响应式适配。
-- `layouts/`：Hugo 页面模板。
-- `LICENSE.magzine`：移植的主题文件所附许可证。
+---
+
+## 4. 常见问题与避坑提示
+
+1. **为什么图片无法显示，提示 404？**
+   - 检查引用路径中是否多写了 `static/`。切记：电脑里的 `static/images/a.webp`，在 Markdown 里面一定要写成 `/images/a.webp`。
+   - 检查文件名的大小写是否完全一致（Linux 服务器对大小写严格敏感）。
+2. **为什么我写的文章本地看得到，但是推送到 GitHub 后线上找不到？**
+   - 检查文章 Front Matter 开头的 `draft:` 字段，发布前必须将其改为 `draft: false`。
+3. **相册中新加的照片比例失真怎么办？**
+   - 在 `data/gallery.yaml` 中，`ratio` 参数必须准确对应图片的「宽度 ÷ 高度」。例如宽 1920 高 1080 的照片，`ratio` 应写为 `1.7778`；宽 1080 高 1620 的竖图，`ratio` 应写为 `0.6667`。
+4. **更换网站全局配置**：
+   - 网站标题、副标题、导航菜单、头像（`avatar`）、首页大图（`heroImage`）、ICP 备案号等信息统一在 `hugo.toml` 中修改。
