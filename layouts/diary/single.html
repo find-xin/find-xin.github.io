@@ -50,10 +50,14 @@
     <div class="diary-detail-actions">
       <div class="diary-action-spacer" aria-hidden="true"></div>
 
-      <button class="diary-detail-like-btn" type="button" data-id="{{ $postID }}" data-likes="{{ .Params.likes | default 5 }}">
+      {{ $likes := 0 }}
+      {{ if isset .Params "likes" }}
+        {{ $likes = .Params.likes }}
+      {{ end }}
+      <button class="diary-detail-like-btn" type="button" data-id="{{ $postID }}" data-likes="{{ $likes }}">
         <span class="heart-icon">♡</span>
         <span class="like-label">喜欢</span>
-        <span class="like-count">{{ .Params.likes | default 5 }}</span>
+        <span class="like-count">{{ $likes }}</span>
       </button>
 
       <div class="diary-lastmod-text">

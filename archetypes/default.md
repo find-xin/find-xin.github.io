@@ -7,4 +7,5 @@ cover: ''
 pinned: false
 tags: []
 categories: []
+likes: 0
 ---

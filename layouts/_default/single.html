@@ -28,10 +28,14 @@
   <div class="post-detail-actions">
     <div class="post-action-spacer" aria-hidden="true"></div>
 
-    <button class="post-detail-like-btn" type="button" aria-label="点赞" data-id="{{ $postID }}" data-likes="{{ .Params.likes | default 8 }}">
+    {{ $likes := 0 }}
+    {{ if isset .Params "likes" }}
+      {{ $likes = .Params.likes }}
+    {{ end }}
+    <button class="post-detail-like-btn" type="button" aria-label="点赞" data-id="{{ $postID }}" data-likes="{{ $likes }}">
       <span class="heart-icon">♡</span>
       <span class="like-label">喜欢</span>
-      <span class="like-count">{{ .Params.likes | default 8 }}</span>
+      <span class="like-count">{{ $likes }}</span>
     </button>
 
     <div class="post-updated-notice">

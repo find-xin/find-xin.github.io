@@ -77,9 +77,13 @@
           {{ end }}
           <div class="diary-card-footer">
             <span class="diary-card-date">{{ .Date.Format "01-02" }}</span>
-            <button class="diary-like-btn" type="button" aria-label="点赞" data-id="{{ $postID }}" data-likes="{{ .Params.likes | default 5 }}">
+            {{ $likes := 0 }}
+            {{ if isset .Params "likes" }}
+              {{ $likes = .Params.likes }}
+            {{ end }}
+            <button class="diary-like-btn" type="button" aria-label="点赞" data-id="{{ $postID }}" data-likes="{{ $likes }}">
               <span class="heart-icon">♡</span>
-              <span class="like-count">{{ .Params.likes | default 5 }}</span>
+              <span class="like-count">{{ $likes }}</span>
             </button>
           </div>
         </div>

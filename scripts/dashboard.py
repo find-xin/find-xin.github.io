@@ -275,6 +275,56 @@ def get_gallery_images():
             items.append(item)
     return items
 
+def get_all_unique_tags_data() -> tuple[list[str], dict[str, int]]:
+    """收集全站所有已有标签与其使用频次，按频率从高到低排序"""
+    preset_tags = ['博客', '前端', 'Hugo', '开发', '随笔', '折腾记录', '日常', 'Python', 'Obsidian', '型月', '魔法使之夜', '月姬', 'Fate']
+    tag_counts = {}
+    tag_map = {}
+    for t in preset_tags:
+        lower = t.lower()
+        tag_map[lower] = t
+        tag_counts[lower] = 0
+
+    def add_tag(t):
+        if isinstance(t, str):
+            clean = t.strip()
+            if clean:
+                lower = clean.lower()
+                tag_counts[lower] = tag_counts.get(lower, 0) + 1
+                if lower in tag_map:
+                    if tag_map[lower].islower() and not clean.islower():
+                        tag_map[lower] = clean
+                else:
+                    tag_map[lower] = clean
+
+    try:
+        for a in get_all_articles():
+            for t in a.get('tags', []):
+                add_tag(t)
+    except Exception:
+        pass
+    try:
+        for g in get_gallery_images():
+            for t in g.get('tags', []):
+                add_tag(t)
+    except Exception:
+        pass
+    try:
+        for r in parse_resources_yaml():
+            for t in r.get('tags', []):
+                add_tag(t)
+    except Exception:
+        pass
+
+    # 按使用频次从高到低排序（频次相同按字母序）
+    sorted_keys = sorted(tag_map.keys(), key=lambda k: (-tag_counts.get(k, 0), k))
+    sorted_tags = [tag_map[k] for k in sorted_keys]
+    return sorted_tags, tag_counts
+
+def get_all_unique_tags() -> list[str]:
+    tags, _ = get_all_unique_tags_data()
+    return tags
+
 def get_next_number(category: str, items: list):
     cat_items = [it for it in items if it.get('category') == category]
     max_num = 0
@@ -879,6 +929,65 @@ HTML_PAGE = """<!DOCTYPE html>
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
     }
 
+    .tag-selector-wrapper {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: var(--card-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .tag-selector-header {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tag-chips-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 140px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .tag-chip:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-soft);
+      transform: translateY(-1px);
+    }
+    .tag-chip.is-active {
+      background: var(--primary) !important;
+      border-color: var(--primary) !important;
+      color: #ffffff !important;
+      font-weight: 600;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+    .tag-chip.is-active:hover {
+      background: var(--primary-hover) !important;
+      color: #ffffff !important;
+    }
+    .tag-chip-icon {
+      font-size: 0.72rem;
+      line-height: 1;
+    }
+
     .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .chip {
       padding: 3px 10px;
@@ -1254,12 +1363,13 @@ HTML_PAGE = """<!DOCTYPE html>
           </div>
           <div class="form-group">
             <label class="form-label">标签（逗号分隔，可选）</label>
-            <input type="text" id="pub-tags" class="form-input" placeholder="例如：魔法使之夜,Python,随想">
-            <div class="chip-group">
-              <span class="chip" onclick="addTag('魔法使之夜')">+ 魔法使之夜</span>
-              <span class="chip" onclick="addTag('Python')">+ Python</span>
-              <span class="chip" onclick="addTag('随笔')">+ 随笔</span>
-              <span class="chip" onclick="addTag('教程')">+ 教程</span>
+            <input type="text" id="pub-tags" class="form-input" placeholder="例如：魔法使之夜, Python, 随笔">
+            <div class="tag-selector-wrapper">
+              <div class="tag-selector-header">
+                <span>🏷️ 点击下方已有标签直接选取 / 取消：</span>
+                <button type="button" class="btn btn-sm" style="font-size:0.72rem;padding:1px 6px;" onclick="clearTagSelector('pub-tags', 'pub-tag-chips')">清空</button>
+              </div>
+              <div id="pub-tag-chips" class="tag-chips-container"></div>
             </div>
           </div>
         </div>
@@ -1322,6 +1432,13 @@ HTML_PAGE = """<!DOCTYPE html>
           <div class="form-group">
             <label class="form-label">标签（逗号分隔）</label>
             <input type="text" id="res-file-tags" class="form-input" placeholder="例如：TypeScript,前端,手册">
+            <div class="tag-selector-wrapper">
+              <div class="tag-selector-header">
+                <span>🏷️ 点击下方已有标签直接选取 / 取消：</span>
+                <button type="button" class="btn btn-sm" style="font-size:0.72rem;padding:1px 6px;" onclick="clearTagSelector('res-file-tags', 'res-file-tag-chips')">清空</button>
+              </div>
+              <div id="res-file-tag-chips" class="tag-chips-container"></div>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">简要描述 / 备注说明</label>
@@ -1364,6 +1481,13 @@ HTML_PAGE = """<!DOCTYPE html>
           <div class="form-group">
             <label class="form-label">标签（逗号分隔）</label>
             <input type="text" id="res-folder-tags" class="form-input" value="文件夹合集,压缩包" placeholder="例如：合集,源码,打包">
+            <div class="tag-selector-wrapper">
+              <div class="tag-selector-header">
+                <span>🏷️ 点击下方已有标签直接选取 / 取消：</span>
+                <button type="button" class="btn btn-sm" style="font-size:0.72rem;padding:1px 6px;" onclick="clearTagSelector('res-folder-tags', 'res-folder-tag-chips')">清空</button>
+              </div>
+              <div id="res-folder-tag-chips" class="tag-chips-container"></div>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">简要描述 / 备注说明</label>
@@ -1429,7 +1553,7 @@ HTML_PAGE = """<!DOCTYPE html>
             </div>
           </div>
 
-          <div class="grid-3">
+          <div class="grid-2">
             <div class="form-group">
               <label class="form-label">所属相册分类</label>
               <select id="gallery-cat" class="form-input">
@@ -1442,9 +1566,16 @@ HTML_PAGE = """<!DOCTYPE html>
               <label class="form-label">作品标题 / 描述 (Caption)</label>
               <input type="text" id="gallery-caption" class="form-input" placeholder="例如：苍崎青子·魔弹">
             </div>
-            <div class="form-group">
-              <label class="form-label">标签 (逗号分隔)</label>
-              <input type="text" id="gallery-tags" class="form-input" placeholder="例如：魔法使之夜,型月,壁纸">
+          </div>
+          <div class="form-group">
+            <label class="form-label">标签 (逗号分隔)</label>
+            <input type="text" id="gallery-tags" class="form-input" placeholder="例如：魔法使之夜,型月,壁纸">
+            <div class="tag-selector-wrapper">
+              <div class="tag-selector-header">
+                <span>🏷️ 点击下方已有标签直接选取 / 取消：</span>
+                <button type="button" class="btn btn-sm" style="font-size:0.72rem;padding:1px 6px;" onclick="clearTagSelector('gallery-tags', 'gallery-tag-chips')">清空</button>
+              </div>
+              <div id="gallery-tag-chips" class="tag-chips-container"></div>
             </div>
           </div>
 
@@ -1624,7 +1755,7 @@ HTML_PAGE = """<!DOCTYPE html>
   </div>
 
   <!-- 文章/日记 快速编辑 Modal -->
-  <div class="modal-overlay" id="edit-article-modal" onclick="closeArticleEditModal(event)">
+  <div class="modal-overlay" id="edit-article-modal">
     <div class="modal-content" style="max-width: 600px;">
       <div class="modal-header">
         <h3 id="edit-article-modal-title">✏️ 快捷编辑文章 / 日记</h3>
@@ -1648,7 +1779,14 @@ HTML_PAGE = """<!DOCTYPE html>
         <div class="form-group">
           <label class="form-label">标签 (Tags)</label>
           <input type="text" id="edit-article-tags" class="form-input" placeholder="如：Fate, 魔法使之夜（多个标签用逗号分隔）">
-          <div class="form-hint">💡 多个标签以中英文逗号隔开即可。</div>
+          <div class="tag-selector-wrapper">
+            <div class="tag-selector-header">
+              <span>🏷️ 点击下方已有标签直接选取 / 取消：</span>
+              <button type="button" class="btn btn-sm" style="font-size:0.72rem;padding:1px 6px;" onclick="clearTagSelector('edit-article-tags', 'edit-article-tag-chips')">清空</button>
+            </div>
+            <div id="edit-article-tag-chips" class="tag-chips-container"></div>
+          </div>
+          <div class="form-hint">💡 可直接点击上方标签快速增删，亦可手动输入（中英文逗号隔开）。</div>
         </div>
         <div class="form-group">
           <label class="form-label">文章摘要 / 描述</label>
@@ -1674,7 +1812,7 @@ HTML_PAGE = """<!DOCTYPE html>
   </div>
 
   <!-- 相册图片 快捷编辑 Modal -->
-  <div class="modal-overlay" id="edit-gallery-modal" onclick="closeGalleryEditModal(event)">
+  <div class="modal-overlay" id="edit-gallery-modal">
     <div class="modal-content" style="max-width: 550px;">
       <div class="modal-header">
         <h3>✏️ 编辑相册作品信息</h3>
@@ -1704,7 +1842,14 @@ HTML_PAGE = """<!DOCTYPE html>
         <div class="form-group">
           <label class="form-label">标签 (Tags)</label>
           <input type="text" id="edit-gallery-tags" class="form-input" placeholder="如：魔法使之夜, 苍崎青子（逗号分隔）">
-          <div class="form-hint">💡 多个标签以逗号隔开。</div>
+          <div class="tag-selector-wrapper">
+            <div class="tag-selector-header">
+              <span>🏷️ 点击下方已有标签直接选取 / 取消：</span>
+              <button type="button" class="btn btn-sm" style="font-size:0.72rem;padding:1px 6px;" onclick="clearTagSelector('edit-gallery-tags', 'edit-gallery-tag-chips')">清空</button>
+            </div>
+            <div id="edit-gallery-tag-chips" class="tag-chips-container"></div>
+          </div>
+          <div class="form-hint">💡 可直接点击上方标签快速增删，亦可手动输入（逗号隔开）。</div>
         </div>
       </div>
       <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
@@ -1719,6 +1864,136 @@ HTML_PAGE = """<!DOCTYPE html>
     let allGallery = [];
     let curGalleryCat = 'all';
     let curModalItem = null;
+    let allAvailableTags = [];
+    let tagCounts = {};
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function escapeJs(str) {
+      if (!str) return '';
+      return JSON.stringify(String(str)).slice(1, -1);
+    }
+
+    /* ========================================== */
+    /* 🏷️ 交互式多选标签管理逻辑                 */
+    /* ========================================== */
+    async function loadAllTags() {
+      try {
+        const res = await fetch('/api/tags');
+        const data = await res.json();
+        const tags = Array.isArray(data) ? data : (data.tags || []);
+        if (data.counts && typeof data.counts === 'object') {
+          tagCounts = data.counts;
+        }
+        if (Array.isArray(tags)) {
+          allAvailableTags = tags;
+          refreshAllTagSelectors();
+        }
+      } catch (e) {
+        console.error('加载已有标签失败:', e);
+      }
+    }
+
+    function parseTagsFromInput(inputVal) {
+      if (!inputVal) return [];
+      return inputVal.split(/[,，]/).map(t => t.trim()).filter(Boolean);
+    }
+
+    function syncTagChips(inputId, containerId) {
+      const inputEl = document.getElementById(inputId);
+      const containerEl = document.getElementById(containerId);
+      if (!inputEl || !containerEl) return;
+
+      const currentTags = parseTagsFromInput(inputEl.value);
+      // 保持全站按使用频率降序排列（高频标签排在最前），用户自行输入的非全站标签排在末尾
+      const tagSet = new Set([...allAvailableTags, ...currentTags]);
+      const displayTags = Array.from(tagSet);
+
+      if (displayTags.length === 0) {
+        containerEl.innerHTML = '<span style="font-size:0.75rem;color:var(--text-muted);padding:4px 2px;">暂无可选标签</span>';
+        return;
+      }
+
+      containerEl.innerHTML = displayTags.map(tag => {
+        const isActive = currentTags.some(t => t.toLowerCase() === tag.toLowerCase());
+        const count = tagCounts[tag.toLowerCase()] || 0;
+        const countBadge = count > 0 ? `<span class="tag-chip-count" style="font-size:0.7rem;opacity:0.75;margin-left:3px;font-variant-numeric:tabular-nums;">${count}</span>` : '';
+        const tipAction = isActive ? '点击移除该标签' : '点击添加该标签';
+        const tipCount = count > 0 ? ` · 全站已使用 ${count} 次` : '';
+        return `
+          <span class="tag-chip ${isActive ? 'is-active' : ''}" 
+                onclick="toggleTagSelection('${escapeJs(inputId)}', '${escapeJs(containerId)}', '${escapeJs(tag)}')"
+                title="${tipAction}${tipCount}">
+            <span class="tag-chip-icon">${isActive ? '✓' : '+'}</span>
+            <span>${escapeHtml(tag)}</span>${countBadge}
+          </span>
+        `;
+      }).join('');
+    }
+
+    function toggleTagSelection(inputId, containerId, tag) {
+      const inputEl = document.getElementById(inputId);
+      if (!inputEl) return;
+
+      let currentTags = parseTagsFromInput(inputEl.value);
+      const existingIdx = currentTags.findIndex(t => t.toLowerCase() === tag.toLowerCase());
+
+      if (existingIdx >= 0) {
+        currentTags.splice(existingIdx, 1);
+      } else {
+        currentTags.push(tag);
+      }
+
+      inputEl.value = currentTags.join(', ');
+      syncTagChips(inputId, containerId);
+    }
+
+    function clearTagSelector(inputId, containerId) {
+      const inputEl = document.getElementById(inputId);
+      if (inputEl) {
+        inputEl.value = '';
+        syncTagChips(inputId, containerId);
+      }
+    }
+
+    function bindTagSelectorInput(inputId, containerId) {
+      const inputEl = document.getElementById(inputId);
+      if (!inputEl) return;
+      inputEl.addEventListener('input', () => {
+        syncTagChips(inputId, containerId);
+      });
+    }
+
+    function refreshAllTagSelectors() {
+      const selectors = [
+        { input: 'pub-tags', chips: 'pub-tag-chips' },
+        { input: 'res-file-tags', chips: 'res-file-tag-chips' },
+        { input: 'res-folder-tags', chips: 'res-folder-tag-chips' },
+        { input: 'gallery-tags', chips: 'gallery-tag-chips' },
+        { input: 'edit-article-tags', chips: 'edit-article-tag-chips' },
+        { input: 'edit-gallery-tags', chips: 'edit-gallery-tag-chips' }
+      ];
+      for (const s of selectors) {
+        syncTagChips(s.input, s.chips);
+      }
+    }
+
+    function initTagSelectors() {
+      const selectors = [
+        { input: 'pub-tags', chips: 'pub-tag-chips' },
+        { input: 'res-file-tags', chips: 'res-file-tag-chips' },
+        { input: 'res-folder-tags', chips: 'res-folder-tag-chips' },
+        { input: 'gallery-tags', chips: 'gallery-tag-chips' },
+        { input: 'edit-article-tags', chips: 'edit-article-tag-chips' },
+        { input: 'edit-gallery-tags', chips: 'edit-gallery-tag-chips' }
+      ];
+      for (const s of selectors) {
+        bindTagSelectorInput(s.input, s.chips);
+      }
+      loadAllTags();
+    }
 
     /* Toast 提示系统 */
     function showToast(message, type = 'info') {
@@ -1943,7 +2218,9 @@ HTML_PAGE = """<!DOCTYPE html>
           document.getElementById('res-file-path').value = '';
           document.getElementById('res-file-title').value = '';
           document.getElementById('res-file-desc').value = '';
+          clearTagSelector('res-file-tags', 'res-file-tag-chips');
           loadResources();
+          loadAllTags();
         } else {
           showToast('上传失败: ' + data.message, 'error');
         }
@@ -1981,7 +2258,9 @@ HTML_PAGE = """<!DOCTYPE html>
           document.getElementById('res-folder-path').value = '';
           document.getElementById('res-folder-title').value = '';
           document.getElementById('res-folder-desc').value = '';
+          clearTagSelector('res-folder-tags', 'res-folder-tag-chips');
           loadResources();
+          loadAllTags();
         } else {
           showToast('打包失败: ' + data.message, 'error');
         }
@@ -2087,9 +2366,7 @@ HTML_PAGE = """<!DOCTYPE html>
 
     function setCategory(cat) { document.getElementById('pub-category').value = cat; }
     function addTag(tag) {
-      const el = document.getElementById('pub-tags');
-      const cur = el.value.trim();
-      el.value = cur ? (cur.includes(tag) ? cur : cur + ',' + tag) : tag;
+      toggleTagSelection('pub-tags', 'pub-tag-chips', tag);
     }
     function setGitMsg(msg) { document.getElementById('git-msg').value = msg; }
 
@@ -2201,6 +2478,7 @@ HTML_PAGE = """<!DOCTYPE html>
         log.textContent = data.output || data.message;
         if (data.success) {
           showToast('🎉 发布成功！已生成页面包', 'success');
+          loadAllTags();
         } else {
           showToast('❌ 发布失败：' + data.message, 'error');
         }
@@ -2336,11 +2614,13 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('edit-gallery-category').value = item.category || 'anime';
       document.getElementById('edit-gallery-date').value = item.date || '';
       document.getElementById('edit-gallery-tags').value = (item.tags || []).join(', ');
+      syncTagChips('edit-gallery-tags', 'edit-gallery-tag-chips');
       document.getElementById('edit-gallery-modal').classList.add('is-active');
     }
 
     function closeGalleryEditModal(e) {
-      if (e.target.id === 'edit-gallery-modal') closeGalleryEditModalDirect();
+      // 仅允许点击“取消”或“关闭”按钮退出编辑，禁止误点背景遮罩关闭
+      return;
     }
     function closeGalleryEditModalDirect() {
       document.getElementById('edit-gallery-modal').classList.remove('is-active');
@@ -2375,6 +2655,7 @@ HTML_PAGE = """<!DOCTYPE html>
           showToast(data.message, 'success');
           closeGalleryEditModalDirect();
           await loadGallery();
+          loadAllTags();
         } else {
           showToast('保存失败: ' + data.message, 'error');
         }
@@ -2414,7 +2695,9 @@ HTML_PAGE = """<!DOCTYPE html>
           showToast('🎉 成功加入相册！', 'success');
           document.getElementById('gallery-file-path').value = '';
           document.getElementById('gallery-caption').value = '';
+          clearTagSelector('gallery-tags', 'gallery-tag-chips');
           loadGallery();
+          loadAllTags();
         } else {
           showToast(data.message, 'error');
         }
@@ -2452,6 +2735,7 @@ HTML_PAGE = """<!DOCTYPE html>
         if (data.success) {
           showToast(data.message, 'success');
           loadGallery();
+          loadAllTags();
         } else {
           showToast(data.message, 'error');
         }
@@ -2544,6 +2828,7 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('edit-article-slug').value = item.slug;
       document.getElementById('edit-article-title').value = item.title || '';
       document.getElementById('edit-article-tags').value = (item.tags || []).join(', ');
+      syncTagChips('edit-article-tags', 'edit-article-tag-chips');
 
       const catInput = document.getElementById('edit-article-categories');
       if (item.type === 'diary') {
@@ -2562,7 +2847,8 @@ HTML_PAGE = """<!DOCTYPE html>
     }
 
     function closeArticleEditModal(e) {
-      if (e.target.id === 'edit-article-modal') closeArticleEditModalDirect();
+      // 仅允许点击“取消”或“关闭”按钮退出编辑，禁止误点背景遮罩关闭
+      return;
     }
     function closeArticleEditModalDirect() {
       document.getElementById('edit-article-modal').classList.remove('is-active');
@@ -2602,6 +2888,7 @@ HTML_PAGE = """<!DOCTYPE html>
           showToast(data.message, 'success');
           closeArticleEditModalDirect();
           await loadArticles();
+          loadAllTags();
         } else {
           showToast('保存失败: ' + data.message, 'error');
         }
@@ -2765,15 +3052,6 @@ HTML_PAGE = """<!DOCTYPE html>
       }
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-    function escapeJs(str) {
-      if (!str) return '';
-      return JSON.stringify(String(str)).slice(1, -1);
-    }
-
     // 支持拖拽文件直接识别填充路径
     window.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -2819,6 +3097,7 @@ HTML_PAGE = """<!DOCTYPE html>
     // 初始化加载
     loadRecentNotes();
     loadResources();
+    initTagSelectors();
   </script>
 </body>
 </html>
@@ -2896,6 +3175,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif url.path == '/api/articles':
             articles = get_all_articles()
             self.send_json(articles)
+        elif url.path == '/api/tags':
+            tags, counts = get_all_unique_tags_data()
+            self.send_json({'tags': tags, 'counts': counts})
         elif url.path == '/api/gallery':
             items = get_gallery_images()
             self.send_json(items)

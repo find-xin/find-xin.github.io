@@ -724,7 +724,7 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
         cur_tags = tags or (fm.get('tags', '').strip('[]').split(',') if 'tags' in fm else ['生活', '手记'])
         cur_tags = [t.strip().strip("'\"") for t in cur_tags if t.strip()]
         out_fm.append(f"tags: {cur_tags}")
-        out_fm.append(f"likes: {fm.get('likes', 5)}")
+        out_fm.append(f"likes: {fm.get('likes', 0)}")
     else:
         # 智能提取摘要：跳过图片与空行，提取首段纯文字
         summary = fm.get('summary')
@@ -760,6 +760,7 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
         cur_tags = tags or (fm.get('tags', '').strip('[]').split(',') if 'tags' in fm else ['Obsidian'])
         cur_tags = [t.strip().strip("'\"") for t in cur_tags if t.strip()]
         out_fm.append(f"tags: {cur_tags}")
+        out_fm.append(f"likes: {fm.get('likes', 0)}")
 
     out_fm.append("---\n")
 
@@ -925,6 +926,7 @@ def process_ipynb_notebook(ipynb_path: Path, note_type: str, custom_slug: str | 
 
     cur_tags = tags or ['Jupyter', 'Python', '数据分析']
     out_fm.append(f"tags: {cur_tags}")
+    out_fm.append("likes: 0")
     out_fm.append("---\n")
 
     target_md = target_dir / 'index.md'
@@ -1171,6 +1173,7 @@ def process_pdf_note(pdf_path: Path, note_type: str = 'post', custom_slug: str |
         f"pdf: 'attachments/{safe_name}'",
         "hideCover: true",
         f"description: '{description or f'PDF 文档笔记：《{title}》（文件大小：{size_str}）'}'",
+        "likes: 0",
         "---",
         "",
         f'{{{{< pdf src="attachments/{safe_name}" title="{title}" height="800px" >}}}}',
