@@ -31,9 +31,16 @@
     </header>
 
     {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
-    {{ with $coverUrl }}
+    {{ $coverBase := path.Base (.Params.cover | default "") }}
+    {{ $inContent := false }}
+    {{ if $coverBase }}
+      {{ if in $.Content $coverBase }}
+        {{ $inContent = true }}
+      {{ end }}
+    {{ end }}
+    {{ if and $coverUrl (not .Params.hideCover) (not $inContent) }}
       <figure class="diary-detail-cover">
-        <img src="{{ . }}" alt="{{ $.Title }}" fetchpriority="high">
+        <img src="{{ $coverUrl }}" alt="{{ $.Title }}" fetchpriority="high">
       </figure>
     {{ end }}
 

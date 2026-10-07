@@ -11,7 +11,14 @@
   {{ end }}
   <header class="post-header">
     {{ $coverUrl := partial "image-url.html" (dict "context" . "src" .Params.cover) }}
-    {{ if and $coverUrl (not .Params.hideCover) }}<figure class="post-cover"><img src="{{ $coverUrl }}" alt="{{ $.Title }}配图" fetchpriority="high"></figure>{{ end }}
+    {{ $coverBase := path.Base (.Params.cover | default "") }}
+    {{ $inContent := false }}
+    {{ if $coverBase }}
+      {{ if in $.Content $coverBase }}
+        {{ $inContent = true }}
+      {{ end }}
+    {{ end }}
+    {{ if and $coverUrl (not .Params.hideCover) (not $inContent) }}<figure class="post-cover"><img src="{{ $coverUrl }}" alt="{{ $.Title }}配图" fetchpriority="high"></figure>{{ end }}
     <div class="post-meta">{{ range first 1 (.GetTerms "categories") }}<span class="post-category"><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></span>{{ end }}<time class="post-date" datetime="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ .Date.Format "2006-01-02 15:04" }}</time><span class="post-author">{{ site.Params.author }}</span>{{ if gt .WordCount 0 }}<span class="post-reading-stat">约 {{ .WordCount }} 字 · {{ .ReadingTime }} 分钟阅读</span>{{ end }}</div>
     <h1 class="post-title">{{ .Title }}</h1>
     {{ with .GetTerms "tags" }}<div class="post-tags">{{ range . }}<a class="tag" href="{{ .RelPermalink }}">#{{ .LinkTitle }}</a>{{ end }}</div>{{ end }}

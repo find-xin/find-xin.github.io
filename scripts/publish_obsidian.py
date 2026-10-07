@@ -721,6 +721,8 @@ def process_obsidian_note(md_path: Path, note_type: str, custom_slug: str | None
             out_fm.append(f"location: '{fm['location']}'")
         if final_cover:
             out_fm.append(f"cover: '{final_cover}'")
+            if final_cover in new_body or 'attachments/' in new_body:
+                out_fm.append("hideCover: true")
         cur_tags = tags or (fm.get('tags', '').strip('[]').split(',') if 'tags' in fm else ['生活', '手记'])
         cur_tags = [t.strip().strip("'\"") for t in cur_tags if t.strip()]
         out_fm.append(f"tags: {cur_tags}")
