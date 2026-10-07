@@ -1763,6 +1763,7 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
       <div class="modal-body">
         <input type="hidden" id="edit-article-original-slug">
+        <input type="hidden" id="edit-article-type">
         <div class="form-group">
           <label class="form-label">标题</label>
           <input type="text" id="edit-article-title" class="form-input" placeholder="文章或日记标题">
@@ -1771,6 +1772,20 @@ HTML_PAGE = """<!DOCTYPE html>
           <label class="form-label">标识 / Slug (生成网址路径)</label>
           <input type="text" id="edit-article-slug" class="form-input" placeholder="如：tsukihime-game（建议小写英文、数字与短横线）">
           <div class="form-hint">🔗 将决定文章访问网址（如 <code>/posts/标识名/</code> 或 <code>/diary/标识名/</code>）。修改后系统会自动写入重定向别名，旧外链不失效。</div>
+        </div>
+        <div class="form-group" id="edit-article-mood-group" style="display: none;">
+          <label class="form-label">日记心情 / 状态徽标 (Mood)</label>
+          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+            <input type="text" id="edit-article-mood" class="form-input" placeholder="如：惬意、开心 ✨、平静 🌿、摸鱼 🐟">
+            <button type="button" class="btn btn-sm" style="white-space: nowrap; font-size: 0.75rem;" onclick="clearMoodInput()">清空</button>
+          </div>
+          <div class="tag-selector-wrapper">
+            <div class="tag-selector-header">
+              <span>✨ 常用心情快速填入：</span>
+            </div>
+            <div id="edit-article-mood-chips" class="tag-chips-container"></div>
+          </div>
+          <div class="form-hint">💡 会展示在日记列表卡片与详情页顶部的胶囊徽标中。可自由输入任意文字或 Emoji，亦可点击上方快捷填入。</div>
         </div>
         <div class="form-group" id="edit-article-cat-group">
           <label class="form-label">分类 (Categories)</label>
@@ -2801,6 +2816,7 @@ HTML_PAGE = """<!DOCTYPE html>
           </td>
           <td>
             <strong>${escapeHtml(item.title)}</strong>
+            ${item.type === 'diary' && item.mood ? `<span class="badge" style="font-size:0.72rem;margin-left:6px;background:var(--primary-soft);color:var(--primary);border:1px solid var(--border);vertical-align:middle;">${escapeHtml(item.mood)}</span>` : ''}
             ${item.tags && item.tags.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;">${item.tags.map(t => `<span class="badge" style="font-size:0.73rem;padding:1px 6px;">#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
           </td>
           <td><code style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(item.slug)}</code></td>
@@ -2817,6 +2833,26 @@ HTML_PAGE = """<!DOCTYPE html>
       `).join('');
     }
 
+    /* 日记心情预设 */
+    const COMMON_MOOD_LIST = ['惬意', '开心 ✨', '平静 🌿', '充实 ☕️', '摸鱼 🐟', '思索 💡', '沉迷 🎮', '困倦 💤', '难过 🌧️', '雀跃 🎉'];
+    function selectMood(val) {
+      document.getElementById('edit-article-mood').value = val;
+      syncMoodChips();
+    }
+    function clearMoodInput() {
+      document.getElementById('edit-article-mood').value = '';
+      syncMoodChips();
+    }
+    function syncMoodChips() {
+      const current = (document.getElementById('edit-article-mood').value || '').trim();
+      const container = document.getElementById('edit-article-mood-chips');
+      if (!container) return;
+      container.innerHTML = COMMON_MOOD_LIST.map(m => {
+        const isActive = (m === current || m.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '') === current.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ''));
+        return `<button type="button" class="tag-chip ${isActive ? 'is-active' : ''}" onclick="selectMood('${escapeJs(m)}')">${escapeHtml(m)}</button>`;
+      }).join('');
+    }
+
     /* 文章/日记 快捷编辑 */
     function openArticleEditModal(slug) {
       const item = allArticles.find(a => a.slug === slug);
@@ -2825,10 +2861,20 @@ HTML_PAGE = """<!DOCTYPE html>
         return;
       }
       document.getElementById('edit-article-original-slug').value = item.slug;
+      document.getElementById('edit-article-type').value = item.type;
       document.getElementById('edit-article-slug').value = item.slug;
       document.getElementById('edit-article-title').value = item.title || '';
       document.getElementById('edit-article-tags').value = (item.tags || []).join(', ');
       syncTagChips('edit-article-tags', 'edit-article-tag-chips');
+
+      const moodGroup = document.getElementById('edit-article-mood-group');
+      if (item.type === 'diary') {
+        moodGroup.style.display = 'block';
+        document.getElementById('edit-article-mood').value = item.mood || '';
+        syncMoodChips();
+      } else {
+        moodGroup.style.display = 'none';
+      }
 
       const catInput = document.getElementById('edit-article-categories');
       if (item.type === 'diary') {
@@ -2856,8 +2902,10 @@ HTML_PAGE = """<!DOCTYPE html>
 
     async function submitEditArticle() {
       const originalSlug = document.getElementById('edit-article-original-slug').value;
+      const isDiary = document.getElementById('edit-article-type').value === 'diary';
       const newSlug = document.getElementById('edit-article-slug').value.trim();
       const title = document.getElementById('edit-article-title').value.trim();
+      const moodVal = isDiary ? document.getElementById('edit-article-mood').value.trim() : null;
       const tagsStr = document.getElementById('edit-article-tags').value.trim();
       const tags = tagsStr ? tagsStr.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
       const catsStr = document.getElementById('edit-article-categories').value.trim();
@@ -2880,7 +2928,8 @@ HTML_PAGE = """<!DOCTYPE html>
             tags: tags,
             categories: categories,
             summary: summary,
-            update_lastmod: updateLastmod
+            update_lastmod: updateLastmod,
+            mood: moodVal
           })
         });
         const data = await res.json();
@@ -3372,8 +3421,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 cats = None
             summary = payload.get('summary', '').strip() or None
             update_lastmod = bool(payload.get('update_lastmod', False))
+            mood = payload.get('mood')
+            if mood is not None:
+                mood = str(mood).strip()
 
-            ok, msg = edit_article_meta(slug, new_slug=new_slug, title=title, tags=tags, categories=cats, summary=summary, update_lastmod=update_lastmod)
+            ok, msg = edit_article_meta(slug, new_slug=new_slug, title=title, tags=tags, categories=cats, summary=summary, update_lastmod=update_lastmod, mood=mood)
             self.send_json({'success': ok, 'message': msg})
 
         elif url.path == '/api/open-file':

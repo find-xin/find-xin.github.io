@@ -2,8 +2,8 @@
 title: '国庆假期回顾'
 date: 2026-10-07T18:24:08+08:00
 draft: false
-mood: '惬意'
-tags: ['日常']
+mood: '沉迷 🎮'
+tags: ["日常"]
 likes: 0
 ---
 

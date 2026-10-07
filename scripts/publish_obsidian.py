@@ -212,6 +212,7 @@ def get_all_articles():
                 'date': date_display,
                 'raw_date': raw_date,
                 'lastmod': lastmod,
+                'mood': fm.get('mood') or fm.get('weather') or '',
                 'tags': fm.get('parsed_tags', []),
                 'categories': fm.get('parsed_categories', []),
                 'summary': fm.get('summary', ''),
@@ -273,8 +274,8 @@ def find_target_item(keyword: str):
                 pass
     return None, None
 
-def edit_article_meta(slug: str, new_slug: str = None, title: str = None, tags: list[str] = None, categories: list[str] = None, summary: str = None, update_lastmod: bool = False) -> tuple[bool, str]:
-    """编辑文章或日记的元数据（标题、标识slug、标签、分类、摘要）。若 update_lastmod 为 False，不改变任何更新时间。"""
+def edit_article_meta(slug: str, new_slug: str = None, title: str = None, tags: list[str] = None, categories: list[str] = None, summary: str = None, update_lastmod: bool = False, mood: str = None) -> tuple[bool, str]:
+    """编辑文章或日记的元数据（标题、标识slug、标签、分类、摘要、心情）。若 update_lastmod 为 False，不改变任何更新时间。"""
     target_item, md_path = find_target_item(slug)
     if not target_item or not md_path:
         return False, f"未找到文章或日记：'{slug}'"
@@ -282,7 +283,7 @@ def edit_article_meta(slug: str, new_slug: str = None, title: str = None, tags: 
     renamed = False
     old_slug = slug
     final_slug = slug
-    type_key = target_item.get('type', 'post')
+    type_key = 'diary' if 'diary' in md_path.parts else 'post'
     old_url = f"/{'posts' if type_key == 'post' else 'diary'}/{old_slug}/"
 
     if new_slug and new_slug.strip() and new_slug.strip() != slug:
@@ -336,6 +337,7 @@ def edit_article_meta(slug: str, new_slug: str = None, title: str = None, tags: 
     has_title = False
     has_tags = False
     has_cats = False
+    has_mood = False
     has_summary = False
     has_lastmod = False
     has_aliases = False
@@ -408,6 +410,18 @@ def edit_article_meta(slug: str, new_slug: str = None, title: str = None, tags: 
             i += 1
             continue
 
+        # 处理 mood / weather
+        if stripped.startswith(('mood:', 'weather:')):
+            has_mood = True
+            if mood is not None:
+                clean_mood = mood.strip().replace("'", "''")
+                if clean_mood:
+                    new_fm_lines.append(f"mood: '{clean_mood}'")
+            else:
+                new_fm_lines.append(line)
+            i += 1
+            continue
+
         # 处理 lastmod: 若 update_lastmod 为 False 则原样保留，绝不更新
         if stripped.startswith('lastmod:'):
             has_lastmod = True
@@ -436,6 +450,9 @@ def edit_article_meta(slug: str, new_slug: str = None, title: str = None, tags: 
         new_fm_lines.append(f"tags: {json.dumps(tags, ensure_ascii=False)}")
     if not has_cats and categories is not None and len(categories) > 0:
         new_fm_lines.append(f"{cat_key}: {json.dumps(categories, ensure_ascii=False)}")
+    if not has_mood and mood is not None and mood.strip():
+        clean_mood = mood.strip().replace("'", "''")
+        new_fm_lines.append(f"mood: '{clean_mood}'")
     if not has_summary and summary is not None and summary.strip():
         clean_sum = summary.strip().replace("'", "''")
         new_fm_lines.append(f"summary: '{clean_sum}'")

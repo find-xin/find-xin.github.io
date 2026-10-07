@@ -2,10 +2,10 @@
 title: '戴森球计划'
 date: 2026-10-07T18:37:11+08:00
 draft: false
-mood: '惬意'
+mood: '沉迷 🎮'
 cover: 'attachments/Pasted-image-20261007183630.webp'
 hideCover: true
-tags: ['日常', '游戏']
+tags: ["日常", "游戏"]
 likes: 0
 ---
 
