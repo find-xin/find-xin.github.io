@@ -1,6 +1,46 @@
 (() => {
   const root = document.documentElement;
 
+  // Share one index request between the search page and Spotlight. Retry failures.
+  let searchIndexPromise;
+  const searchableText = new WeakMap();
+  window.youshuSearch = {
+    load() {
+      if (!searchIndexPromise) {
+        searchIndexPromise = fetch('/index.json').then(response => {
+          if (!response.ok) throw new Error('Search index unavailable');
+          return response.json();
+        }).catch(error => {
+          searchIndexPromise = null;
+          throw error;
+        });
+      }
+      return searchIndexPromise;
+    },
+    matches(doc, query) {
+      let fields = searchableText.get(doc);
+      if (!fields) {
+        fields = [doc.title || '', doc.snippet || '', ...(doc.tags || [])]
+          .map(value => (value || '').toLowerCase());
+        searchableText.set(doc, fields);
+      }
+      return fields.some(value => value.includes(query));
+    }
+  };
+
+  // Coalesce bursts of events into one update before the next paint.
+  const onAnimationFrame = callback => {
+    let pending = false;
+    return () => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        callback();
+      });
+    };
+  };
+
   // 1. Theme switcher with smooth transition
   const button = document.querySelector('.theme-toggle');
   if (button) {
@@ -61,10 +101,10 @@
     }
   };
 
-  window.addEventListener('scroll', () => {
+  window.addEventListener('scroll', onAnimationFrame(() => {
     updateProgress();
     updateBackToTop();
-  }, { passive: true });
+  }), { passive: true });
 
   if (btt) {
     btt.addEventListener('click', () => {
@@ -250,7 +290,7 @@
         }
       };
 
-      window.addEventListener('scroll', updateTocSpy, { passive: true });
+      window.addEventListener('scroll', onAnimationFrame(updateTocSpy), { passive: true });
       updateTocSpy();
     }
   }
@@ -349,17 +389,14 @@
     if (!searchDocuments) {
       if (spotlightStatus) spotlightStatus.textContent = '加载索引...';
       try {
-        const res = await fetch('/index.json');
-        if (res.ok) {
-          searchDocuments = await res.json();
-          if (spotlightStatus) spotlightStatus.textContent = `${searchDocuments.length} 篇内容已就绪`;
-          updateFilterCounts({
-            all: searchDocuments.length,
-            posts: searchDocuments.filter(d => d.section === 'posts').length,
-            diary: searchDocuments.filter(d => d.section === 'diary').length,
-            gallery: searchDocuments.filter(d => d.section === 'gallery').length
-          });
-        }
+        searchDocuments = await window.youshuSearch.load();
+        if (spotlightStatus) spotlightStatus.textContent = `${searchDocuments.length} 篇内容已就绪`;
+        updateFilterCounts({
+          all: searchDocuments.length,
+          posts: searchDocuments.filter(d => d.section === 'posts').length,
+          diary: searchDocuments.filter(d => d.section === 'diary').length,
+          gallery: searchDocuments.filter(d => d.section === 'gallery').length
+        });
       } catch (_) {
         if (spotlightStatus) spotlightStatus.textContent = '索引异常';
       }
@@ -500,12 +537,7 @@
     const q = cleanQuery.toLowerCase();
 
     // 1. 全站匹配
-    const allMatches = searchDocuments.filter(doc => {
-      const titleMatch = (doc.title || '').toLowerCase().includes(q);
-      const snippetMatch = (doc.snippet || '').toLowerCase().includes(q);
-      const tagMatch = (doc.tags || []).some(t => (t || '').toLowerCase().includes(q));
-      return titleMatch || snippetMatch || tagMatch;
-    });
+    const allMatches = searchDocuments.filter(doc => window.youshuSearch.matches(doc, q));
 
     // 2. 更新分类匹配数量
     const counts = {
@@ -783,12 +815,19 @@
   const spotlightCards = document.querySelectorAll('.article-card, .diary-card, .friend-card, .post-signature-card');
   spotlightCards.forEach(card => {
     card.classList.add('has-spotlight');
-    card.addEventListener('mousemove', (e) => {
+    let pointerX = 0;
+    let pointerY = 0;
+    const updateSpotlight = onAnimationFrame(() => {
       const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = pointerX - rect.left;
+      const y = pointerY - rect.top;
       card.style.setProperty('--mouse-x', `${x}px`);
       card.style.setProperty('--mouse-y', `${y}px`);
+    });
+    card.addEventListener('mousemove', (e) => {
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+      updateSpotlight();
     });
   });
 

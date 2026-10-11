@@ -44,19 +44,31 @@
         colDivs.push(col);
       }
 
-      // Append cards to the shortest column for perfect waterfall flow
-      filtered.forEach(card => {
-        let minCol = colDivs[0];
-        let minHeight = minCol.offsetHeight;
-        for (let i = 1; i < colDivs.length; i++) {
-          const h = colDivs[i].offsetHeight;
-          if (h < minHeight) {
-            minHeight = h;
-            minCol = colDivs[i];
+      // Empty columns win in DOM order, exactly as in the shortest-column rule.
+      // Fill them without interleaving DOM writes and forced layout reads.
+      filtered.slice(0, cols).forEach((card, i) => colDivs[i].appendChild(card));
+      if (filtered.length > cols) {
+        const heights = colDivs.map(col => col.offsetHeight);
+        let layoutWidth = wrapper.getBoundingClientRect().width;
+        for (let index = cols; index < filtered.length; index++) {
+          let shortest = 0;
+          for (let i = 1; i < cols; i++) {
+            if (heights[i] < heights[shortest]) shortest = i;
+          }
+          colDivs[shortest].appendChild(filtered[index]);
+          // Only this column changed. Keep native rounded heights and tie order.
+          if (index < filtered.length - 1) {
+            const nextWidth = wrapper.getBoundingClientRect().width;
+            if (nextWidth !== layoutWidth) {
+              // A non-overlay scrollbar can resize every column as the page grows.
+              colDivs.forEach((col, i) => { heights[i] = col.offsetHeight; });
+              layoutWidth = nextWidth;
+            } else {
+              heights[shortest] = colDivs[shortest].offsetHeight;
+            }
           }
         }
-        minCol.appendChild(card);
-      });
+      }
     }
 
     // Run layout immediately and after images load

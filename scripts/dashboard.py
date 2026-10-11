@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import sys
 import json
+import gzip
 import urllib.parse
 import webbrowser
 import subprocess
@@ -25,6 +26,7 @@ import socket
 import re
 import time
 import atexit
+from functools import lru_cache
 from pathlib import Path
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
@@ -3152,9 +3154,43 @@ HTML_PAGE = """<!DOCTYPE html>
 </html>
 """
 
+@lru_cache(maxsize=16)
+def compress_text_response(payload: bytes) -> bytes:
+    # Key by the complete response, so edits always produce fresh compressed bytes.
+    return gzip.compress(payload, compresslevel=4, mtime=0)
+
+
 class DashboardHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
+
+    def send_text(self, payload: bytes, mime: str):
+        # Compress text only when the client accepts gzip; binary files stay intact.
+        accepts_gzip = False
+        for entry in self.headers.get('Accept-Encoding', '').split(','):
+            parts = entry.strip().lower().split(';')
+            if parts[0] != 'gzip':
+                continue
+            try:
+                quality = next((float(p.strip()[2:]) for p in parts[1:]
+                                if p.strip().startswith('q=')), 1.0)
+                accepts_gzip = quality > 0
+            except ValueError:
+                pass
+        compressed = accepts_gzip and len(payload) >= 1024
+        if compressed:
+            payload = compress_text_response(payload)
+        self.send_response(200)
+        self.send_header('Content-Type', mime)
+        self.send_header('Content-Length', str(len(payload)))
+        self.send_header('Vary', 'Accept-Encoding')
+        if compressed:
+            self.send_header('Content-Encoding', 'gzip')
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        self.end_headers()
+        self.wfile.write(payload)
 
     def serve_file(self, filepath: Path):
         mime = MIME_TYPES.get(filepath.suffix.lower(), 'application/octet-stream')
@@ -3169,11 +3205,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         if url.path == '/':
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-            self.end_headers()
-
             running = is_hugo_running()
             badge_class = 'status-badge' if running else 'status-badge stopped'
             status_text = 'Hugo 服务运行中 (1314)' if running else 'Hugo 未运行'
@@ -3202,7 +3233,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 .replace('__GALLERY_COUNT__', str(gallery_count)) \
                 .replace('__RESOURCES_COUNT__', str(resources_count))
 
-            self.wfile.write(html.encode('utf-8'))
+            self.send_text(html.encode('utf-8'), 'text/html; charset=utf-8')
         elif url.path.startswith('/images/'):
             local_path = (BLOG_ROOT / 'static' / url.path.lstrip('/')).resolve()
             if local_path.exists() and local_path.is_file():
@@ -3488,13 +3519,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_error(404, "API Not Found")
 
     def send_json(self, data):
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-        self.send_header('Pragma', 'no-cache')
-        self.send_header('Expires', '0')
-        self.end_headers()
-        self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+        self.send_text(json.dumps(data, ensure_ascii=False).encode('utf-8'),
+                       'application/json; charset=utf-8')
 
 def run_server():
     atexit.register(stop_hugo_server)

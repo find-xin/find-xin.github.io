@@ -106,12 +106,7 @@
     const q = cleanQuery.toLowerCase();
 
     // 1. 全站匹配
-    const allMatches = documents.filter(doc => {
-      const titleMatch = (doc.title || '').toLowerCase().includes(q);
-      const snippetMatch = (doc.snippet || '').toLowerCase().includes(q);
-      const tagMatch = (doc.tags || []).some(t => (t || '').toLowerCase().includes(q));
-      return titleMatch || snippetMatch || tagMatch;
-    });
+    const allMatches = documents.filter(doc => window.youshuSearch.matches(doc, q));
 
     // 2. 更新数量
     const counts = {
@@ -170,11 +165,8 @@
   // Load index data from /index.json
   const loadIndex = async () => {
     try {
-      const res = await fetch('/index.json');
-      if (res.ok) {
-        documents = await res.json();
-        runSearch(input.value);
-      }
+      documents = await window.youshuSearch.load();
+      runSearch(input.value);
     } catch (_) {
       status.textContent = '加载搜索索引失败，请刷新页面重试。';
     }
