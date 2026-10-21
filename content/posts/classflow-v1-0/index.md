@@ -2,12 +2,12 @@
 title: 'Classflow v1.0 收工'
 date: 2026-10-21T18:19:29+08:00
 draft: false
-summary: '经过十天左右时间，集成了wakeup的课程，苹果日历的日程，待办事项，番茄钟的classflow第一版算是最终完成了。目前发布的有Mac端和手机安卓端，其中手机'
+summary: 'Classflow v1.0完工'
 cover: 'attachments/Pasted-image-20261021181927.webp'
 hideCover: true
 pinned: false
-categories: ['APP开发']
-tags: ['Obsidian']
+categories: ["APP开发"]
+tags: []
 likes: 0
 ---
 
