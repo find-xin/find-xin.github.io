@@ -1,8 +1,8 @@
 ---
 title: 'Classflow v1.0 收工'
-date: 2026-10-21T18:19:29+08:00
+date: 2026-10-21T18:24:59+08:00
 draft: false
-summary: 'Classflow v1.0完工'
+summary: 'https://github.com/find-xin/ClassFlow/releases/tag/v1.0.0'
 cover: 'attachments/Pasted-image-20261021181927.webp'
 hideCover: true
 pinned: false
@@ -12,6 +12,8 @@ likes: 0
 ---
 
 ![Pasted image 20261021181927](attachments/Pasted-image-20261021181927.webp)
+
+App链接 https://github.com/find-xin/ClassFlow/releases/tag/v1.0.0
 
 经过十天左右时间，集成了wakeup的课程，苹果日历的日程，待办事项，番茄钟的classflow第一版算是最终完成了。目前发布的有Mac端和手机安卓端，其中手机安卓端有小组件，Mac端由于受到苹果渠道认证限制无法开启小组件。
 
@@ -24,7 +26,8 @@ Mac端本地Chatgpt客户端在载入classflow插件并创建MCP服务器后，�
 后续开发计划（按顺序）：
 1. 完善小米手环端app并测试
 2. 适配安卓平板11英寸
-3. 优化性能稳定性和用户体验
-4. 开发Windows端（如有需求）
-5. 适配ios IPhone端（如有需求）
-6. 开发Linux端（如有需求）
+3. 安卓端接入Chatgpt
+4. 优化性能稳定性和用户体验
+5. 开发Windows端（如有需求）
+6. 适配ios IPhone端（如有需求）
+7. 开发Linux端（如有需求）
